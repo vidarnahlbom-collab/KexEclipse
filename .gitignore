@@ -1,0 +1,5 @@
+# Ignonera SPICE kernels
+*.bsp
+*.tls
+*.tpc
+*.tf
