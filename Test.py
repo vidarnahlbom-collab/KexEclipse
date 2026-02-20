@@ -2,9 +2,9 @@ import spiceypy as spice
 import os
 
 spice.furnsh("naif0012.tls")
-spice.furnsh("de440s.bsp")
+spice.furnsh("de442s.bsp")
 spice.furnsh("jup365.bsp")
-spice.furnsh("pck00010.tpc")
+spice.furnsh("pck00011.tpc")
 
 types = [ "FULL", "ANNULAR", "PARTIAL", "ANY" ]
 
@@ -24,7 +24,7 @@ spice.wninsd(et0,et1,cnfine)
 step = 900.0
 
 obsrvr = "Earth"
-body1 = "GANYMEDE"
+body1 = "Ganymede"
 body2 = "JUPITER"
 
 # Loop over the occultation types.
