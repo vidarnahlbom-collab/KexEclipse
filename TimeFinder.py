@@ -32,29 +32,34 @@ def main():
     # However do note that only the URL is correct, the time in the NASA Eyes program are adjusted to your location so for us mostly UTC+1 or +2
     
     #types = [ "FULL", "ANNULAR", "PARTIAL", "ANY" ]
-    types = ["PARTIAL"]
+    types = ["ANY"]
 
     # Start and end times for the search window
-    start = "2021 APR 01 00:00:00 TDB"
-    end = "2021 MAY 01 00:00:00 TDB"
+    start = "2021 APR 18 00:00:00 TDB"
+    end = "2021 MAY 20 00:00:00 TDB"
+    
+    # x-minute step. Ignore any occultations lasting less than ~x minutes.
+    # Units are TDB seconds.
+    # 15 min steps might be to large, currently getting partials at less than 15 min
+    step = 100.0
+
 
     # To start, moons will be observers so therefore modelled as point objects
     moons = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"] 
 
-    # Occluder is Jupiter, so we for now only check if any moon is occluded from the Sun by Jupiter
+    # bodies1 will be occluders, all these objects will be checked for occluding the sun
     bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"]  # This will be front object
     #bodies1 = ["JUPITER"]
+    #bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO", "JUPITER"]
     # Checking if Sun is being in fully occluded by Jupiter, so Sun is back object
     body2 = "SUN"
 
     for moon in moons:
         for body1 in bodies1: 
             if moon != body1:
-                occultations(types, body1, body2, moon, start, end)
+                occultations(types, body1, body2, moon, start, end, step)
 
-    # Next would be including moons occluding eachother
-
-def occultations(types, body1, body2, obsrvr, start, end):
+def occultations(types, body1, body2, obsrvr, start, end, step):
     # Size of the window/intervall between start and end date, not sure how it works
     MAXWIN = 200
 
@@ -71,10 +76,6 @@ def occultations(types, body1, body2, obsrvr, start, end):
     # Insert the time bounds into the confinement window
     spice.wninsd(et0, et1, cnfine)
 
-    # 15-minute step. Ignore any occultations lasting less than 15 minutes.
-    # Units are TDB seconds.
-    step = 300.0
-
     # Loop over the occultation types.
     for occtype in types:
             front = body1
@@ -87,7 +88,7 @@ def occultations(types, body1, body2, obsrvr, start, end):
             spice.gfoclt(occtype,
                             front, "ellipsoid", fframe,
                             back,  "ellipsoid", bframe,
-                            "NONE", obsrvr, step,
+                            "LT+S", obsrvr, step,
                             cnfine, result)
 
             # Display the results
