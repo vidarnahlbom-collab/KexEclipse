@@ -11,7 +11,7 @@
 
 import spiceypy as spice
 import os
-
+#din mamma på pizza
 def main():
     # Load all kernels
     spice.furnsh("naif0012.tls")
