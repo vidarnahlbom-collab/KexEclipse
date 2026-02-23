@@ -11,7 +11,89 @@
 
 import spiceypy as spice
 import os
-#din mamma på pizza
+
+
+'''
+PSEUDOKOD
+
+import spiceypy as spice
+from math import pi, sin, cos
+
+
+def ask_moon():
+	‘’’
+	frågar användaren vilken måne som den vill se
+	returnerar “Io”, “Europa”, “Ganymede” eller “Callisto”
+	‘’’
+	pass
+
+
+def ask_time():
+	‘’’
+	frågar användaren efter tidpunkten som den vill kolla
+	returnerar tiden (skulle kunna vara i UTC-sekunder)
+	‘’’
+	pass
+
+
+def calculate_illuminance(point, time):
+	‘’’
+	tar in en punkt vid en specifik tid, och räknar ut hur mycket av solen som skyms
+	returnerar ett flyttal mellan 0 och 1, där 1 representerar maximal solljus
+	‘’’
+	pass
+
+
+def sweep_moon(moon, time, step):
+	‘’’
+	tar in en måne vid en specifik tid, och beräknar solljuset i alla punkter
+	returnerar lista av lista av flyttal
+	‘’’
+	moon_matrix = []
+
+for theta in range(0, pi, step):
+	latitude = []
+	for phi in range(0, 2*pi, step):
+		x = r*sin(theta)*cos(phi)
+		y = r*sin(theta)*sin(phi)
+		z = r*cos(theta)
+		point = moon + Vector(x, y, z)
+		longitude = calculate_illuminance(point, time)
+		latitude.append(longitude)
+	moon_matrix.append(latitude)
+
+return moon_matrix
+
+
+def show_moon(moon_matrix):
+	‘’’
+	ritar månen baserat på de värden som getts
+	returnerar ingenting
+	‘’’
+	pass
+
+
+def main(step = 0.01):
+	‘’’
+	huvudfunktionen som går igenom programmet
+	returnerar ingenting
+	‘’’
+	moon = ask_moon()
+
+	time = ask_time()
+
+	moon_matrix = sweep_moon(moon, time, step)
+
+	show_moon(moon__matrix)
+
+
+if __name__ == ‘__main__’:
+	main()
+'''
+
+
+
+
 def main():
     # Load all kernels
     spice.furnsh("naif0012.tls")
