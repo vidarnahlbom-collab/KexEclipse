@@ -7,10 +7,8 @@ import numpy as np
 
 '''
 TODO:
-CreatePosArray using ellipsoid models, find DSK model?
-Account for surface roughness on planetoids? everything using ellipsoid models
 CreatePosArray doing whole surface, account atleast for only half in sunlight.
-
+Redo using moon fixed body reference frame 
 '''
 
 def main():
