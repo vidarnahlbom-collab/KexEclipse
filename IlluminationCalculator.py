@@ -17,25 +17,22 @@ def main():
     spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
 
-    resolution = 3 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
     et = spice.utc2et("2021 Apr 25 16:25:12")
 
     srfPoints = CreatePosArray(resolution, "Europa", et)
-    body1Pos = CelestialSpherePosFinder("Europa", "Jupiter", et, srfPoints)
-    body2Pos = CelestialSpherePosFinder("Europa", "Sun", et, srfPoints)
-
-    # AI:
-    angular_separations = []
-    for i in range(body1Pos.shape[0]):
-        angular_separations.append(AngularSeparation(body1Pos[i], body2Pos[i]))
-    print(angular_separations)
-    # REMOVE ABOVE JUST FOR TESTING PURPOSES
+    print(srfPoints)
+    jup_diskProps = GetDiskProperties("Europa", "Jupiter", et, srfPoints)
+    print(jup_diskProps)
 
 def CreatePosArray(resolution, body, et):
-    'Given how many points you want and on what body, returns an array of surface points'
+    'Given how many points you want and on what body, returns an array of surface points facing the sun at the given time'
+    
+    subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
+    subsolar_lon = spice.reclat(subsolar_point[0])[1]
 
-    # Longitudes: 0 to 2Pi to cover all points on the surface for now even if only points in penumbra are relevant
-    longitudes = np.linspace(0,2*np.pi,resolution,endpoint=False)
+    # Longitudes: only the longitudes of the half of the planetoid facing the sun
+    longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
 
     # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole. 
     # We also ignore south and north pole as if they are included they will be included resolution times, one for every longitude.
@@ -46,7 +43,7 @@ def CreatePosArray(resolution, body, et):
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
 
     lonlat = np.column_stack((lon_grid.ravel(), lat_grid.ravel())).tolist()
-
+    print(lonlat)
     # Now we put this into spice.latsrf. lonlat will be parsed as planetocentric 
 
     fixref = "IAU_" + body
@@ -55,10 +52,29 @@ def CreatePosArray(resolution, body, et):
     
     return srfPoints
 
-def BodyPosRelativeSrfPos(observer, body, et, srfPoints):
-    'Given time and positions return the apparent size and location of desired body in the celestial sphere at all positions'
+def GetDiskProperties(observer, body, et, srfPoints):
+    """
+    Returns the Right Ascension, Declination and angular size of the body as seen from the surface points.
+    """
 
-    # srfLonLat is now relative planetoid, we want it relative J2000 because thats what spkpos uses
+    Radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
+    body_pos = spice.spkpos(body, et, "IAU_" + observer, "LT+S", observer)
+
+    # THIS IS INCORRECT FOR NOW, WHAT COORDINATE SYSTEM DOES recrad give? need local coordinate system for the celestial sphere as seen from observer point. 
+    for point in srfPoints:
+        body_pos_rel_srf = np.subtract(body_pos[0], point)
+        # spkpos returns xyz coordinates, now in the body fixed frame of the observer, we want to convert this to right ascension and declination for every point.
+        # it also returns the light time, but we ignore this for now
+        body_rad_pos = spice.recrad(body_pos_rel_srf) # This converts the rectangular coordinates to spherical coordinates, we only need the distance for the angular size calculation, and the right ascension and declination for the disk center position
+        body_dis = body_rad_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
+        body_RA = body_rad_pos[1] # This is the right ascension of the body as seen from the point
+        body_Dec = body_rad_pos[2] # This is the declination of the body as seen from the point
+
+        body_ang_radius = math.atan(Radii/body_dis) # In radians
+        diskprops = [body_RA, body_Dec, body_ang_radius]
+        return diskprops
+
+    """ # srfLonLat is now relative planetoid, we want it relative J2000 because thats what spkpos uses
 
     frame1 = "IAU_" + observer
     
@@ -76,7 +92,7 @@ def BodyPosRelativeSrfPos(observer, body, et, srfPoints):
     target_wrt_obs = spice.spkpos(body, et, "J2000", "LT+S", observer)[0]
     target_wrt_surface = target_wrt_obs - surfPoints_j2000
 
-    return target_wrt_surface
+    return target_wrt_surface """
 
 # REMOVE BELOW JUST FOR TESTING PURPOSES, MADE BY AI
 def CelestialSpherePosFinder(observer, body, et, srfPoints):
