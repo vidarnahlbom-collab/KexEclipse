@@ -11,8 +11,18 @@
 
 import spiceypy as spice
 import os
+import math
+import numpy as np
 
-# SKTI KOD
+'''
+TODO:
+CreatePosArray using ellipsoid models, find DSK model?
+Account for surface roughness on planetoids? everything using ellipsoid models
+
+
+'''
+
+
 
 def main():
     # Load all kernels
@@ -61,6 +71,9 @@ def main():
             if moon != body1:
                 occultations(types, body1, body2, moon, start, end, step)
 
+    srfPoints = CreatePosArray(10, "Europa", "2021 Apr 29 11:31:28")
+    print(srfPoints)
+
 def occultations(types, body1, body2, obsrvr, start, end, step):
     # Size of the window/intervall between start and end date, not sure how it works
     MAXWIN = 200
@@ -106,6 +119,48 @@ def occultations(types, body1, body2, obsrvr, start, end, step):
                 left, right = spice.wnfetd(result, i)
                 print("Start:", spice.timout(left, "YYYY Mon DD HR:MN:SC"), "   End:", spice.timout(right, "YYYY Mon DD HR:MN:SC"))
             
+def CreatePosArray(resolution, body, utc, ):
+    'Given how many points you want and on what body, returns an array of surface points'
+
+    # Longitudes: 0 to 2Pi to cover all points on the surface for now even if only points in penumbra are relevant
+    longitudes = np.linspace(0,2*np.pi,resolution,endpoint=False)
+
+    # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole
+    latitudes = np.linspace(-np.pi/2, np.pi/2, resolution)
+
+    # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
+    # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
+    lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
+
+    lonlat = np.column_stack((lon_grid.ravel(), lat_grid.ravel())).tolist()
+
+    # Now we put this into spice.latsrf. lonlat will be parsed as planetocentric 
+
+    et = spice.utc2et(utc)
+    fixref = "IAU_" + body
+
+    srfPoints = spice.latsrf("ellipsoid", body, et, fixref, lonlat)
+    
+    return srfPoints
+
+def CelestialSpherePosFinder(observer, body, utc, srfPoints):
+    'Given time and positions return the apparent size and location of desired body in the celestial sphere at all positions'
+
+    # srfLonLat is now relative planetoid, we want it relative J2000 because thats what spkpos uses
+
+    et = spice.utc2et(utc)
+    frame1 = "IAU_" + observer
+    
+    # We get the rotation matrix needed to convert our planetoid positions to J2000 Inertial coordinates
+    rotMatrix = spice.pxform(frame1, "J2000", et)
+    surfPoints_j2000 = spice.mxv(rotMatrix, srfPoints)
+
+    # But now they are centered around j2000 center, so we need to add Europa position to each vector. 
+
+
+    # spkpos only gives position relative planetoid center of observer, so to get relative pos we need to 
+    
+
 
 if __name__ == '__main__':
-     main()
+    main()
