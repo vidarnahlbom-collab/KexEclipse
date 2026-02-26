@@ -6,20 +6,20 @@
 # Adapted from the example on the documentation page for gfoclt
 # https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/spicelib/gfoclt.html
 
-# Originally from akkana spice examples on github, edited
+# Originally that part of code is from akkana spice examples on github
 # https://github.com/akkana/spice-examples/blob/master/transits.py
 
 import spiceypy as spice
 import os
 
-# SKTI KOD
-
 def main():
     # Load all kernels
-    spice.furnsh("naif0012.tls")
-    spice.furnsh("de442s.bsp")
-    spice.furnsh("jup365.bsp")
-    spice.furnsh("pck00011.tpc")
+    kernel_dir = "kernels"
+    spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
+    spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
+    spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
+    spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
+
 
     # Search for all types of eclipses. Depends on observer. if Sun is observer, you might get annular eclipses of Jupiter by a moon
     # but if observer is a moon, you will never get annular eclipses because no moon enters jupiters antumbra shadow, so jupiter either partially
@@ -45,22 +45,21 @@ def main():
     # 15 min steps might be to large, currently getting partials at less than 15 min
     step = 100.0
 
-
     # To start, moons will be observers so therefore modelled as point objects
     moons = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"] 
 
     # bodies1 will be occluders, all these objects will be checked for occluding the sun
-    bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"]  # This will be front object
-    #bodies1 = ["JUPITER"]
+    #bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"]  # This will be front object
+    bodies1 = ["JUPITER"]
     #bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO", "JUPITER"]
     # Checking if Sun is being in fully occluded by Jupiter, so Sun is back object
     body2 = "SUN"
-
+    
     for moon in moons:
         for body1 in bodies1: 
             if moon != body1:
                 occultations(types, body1, body2, moon, start, end, step)
-
+  
 def occultations(types, body1, body2, obsrvr, start, end, step):
     # Size of the window/intervall between start and end date, not sure how it works
     MAXWIN = 200
@@ -105,7 +104,6 @@ def occultations(types, body1, body2, obsrvr, start, end, step):
             for i in range(count):
                 left, right = spice.wnfetd(result, i)
                 print("Start:", spice.timout(left, "YYYY Mon DD HR:MN:SC"), "   End:", spice.timout(right, "YYYY Mon DD HR:MN:SC"))
-            
 
 if __name__ == '__main__':
-     main()
+    main()
