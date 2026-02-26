@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.13
-
 import spiceypy as spice
 import os
 import math

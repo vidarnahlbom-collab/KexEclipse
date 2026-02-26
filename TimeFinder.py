@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.13
-
 # Model both target bodies as ellipsoids.
 # Search for every type of occultation.
 
