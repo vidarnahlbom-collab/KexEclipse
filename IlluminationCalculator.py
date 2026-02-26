@@ -9,6 +9,7 @@ import numpy as np
 TODO:
 CreatePosArray doing whole surface, account atleast for only half in sunlight.
 Redo using moon fixed body reference frame 
+test rev
 '''
 
 def main():
