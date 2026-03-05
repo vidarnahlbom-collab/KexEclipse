@@ -22,19 +22,23 @@ def main():
     '''
     furnish_kernels()
 
-    moon = select_moon()
-    #moon = "Europa"
+    #moon = select_moon()
+    moon = "Europa"
 
     start_time = time.time()
 
     resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    et = spice.utc2et("2021 Apr 25 16:25:12")
-
+    utc = "2021 Apr 25 15:26:31"
+    et = spice.utc2et(utc)
+    print(utc)
     srf_points = create_pos_array(resolution, moon, et)
     
     jup_disk_props = get_disk_properties(moon, "Jupiter", et, srf_points)
     sun_disk_props = get_disk_properties(moon, "Sun", et, srf_points)
+    
+    blocked_fractions = get_blocked_fractions(sun_disk_props, jup_disk_props)
 
+    print(blocked_fractions)
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
 
 def furnish_kernels():
@@ -136,74 +140,35 @@ def get_disk_properties(observer, body, et, srf_points):
 
     return target_wrt_surface """
 
-
-def angular_separation(disk_props_1, disk_props_2):
+# VSC code
+def get_blocked_fractions(sun_disk_props, jup_disk_props):
     """
-    Given the disk properties of two bodies, calculates the angular separation between them as seen from the surface points.
+    Calculates what fraction of the Sun is blocked by Jupiter at each surface point.
     """
-    ang_sep = []
-
-    for props1, props2 in zip(disk_props_1, disk_props_2):
-        az1, el1, _ = props1
-        az2, el2, _ = props2
-
-        # Convert to Cartesian coordinates
-        x1 = math.cos(el1) * math.cos(az1)
-        y1 = math.cos(el1) * math.sin(az1)
-        z1 = math.sin(el1)
-
-        x2 = math.cos(el2) * math.cos(az2)
-        y2 = math.cos(el2) * math.sin(az2)
-        z2 = math.sin(el2)
-
-        # Calculate the dot product and magnitudes
-        dot_product = x1 * x2 + y1 * y2 + z1 * z2
-        mag1 = math.sqrt(x1**2 + y1**2 + z1**2)
-        mag2 = math.sqrt(x2**2 + y2**2 + z2**2)
-
-        # Calculate the angular separation
-        cos_ang_sep = dot_product / (mag1 * mag2)
-        ang_sep.append(math.acos(cos_ang_sep))
-
-    return ang_sep
-
-
-# GPT code
-def sun_blocked_fraction(p, et):
-    """
-    p  = position of observer relative to moon center (km) in moon-fixed frame
-    et = ephemeris time
-    """
-
-    moon = "EUROPA"   # change if needed
-    frame = "IAU_EUROPA"
-
-    # position of Sun and Jupiter relative to moon center
-    sun_state, _ = spice.spkezr("SUN", et, frame, "LT+S", moon)
-    jup_state, _ = spice.spkezr("JUPITER", et, frame, "LT+S", moon)
-
-    sun_vec = sun_state[:3] - p
-    jup_vec = jup_state[:3] - p
-
-    sun_dist = np.linalg.norm(sun_vec)
-    jup_dist = np.linalg.norm(jup_vec)
-
-    sun_dir = sun_vec / sun_dist
-    jup_dir = jup_vec / jup_dist
-
-    # angular separation
-    d = np.arccos(np.clip(np.dot(sun_dir, jup_dir), -1.0, 1.0))
-
-    # radii from kernels
-    sun_rad = spice.bodvrd("SUN", "RADII", 3)[1][0]
-    jup_rad = spice.bodvrd("JUPITER", "RADII", 3)[1][0]
-
-    # angular radii
-    r1 = np.arcsin(sun_rad / sun_dist)
-    r2 = np.arcsin(jup_rad / jup_dist)
-
-    return disk_overlap_fraction(r1, r2, d)
-
+    blocked_fractions = []
+    
+    for sun_props, jup_props in zip(sun_disk_props, jup_disk_props):
+        sun_az, sun_el, sun_ang_rad = sun_props
+        jup_az, jup_el, jup_ang_rad = jup_props
+        
+        # Convert azimuth and elevation to Cartesian coordinates
+        sun_x = math.cos(sun_el) * math.cos(sun_az)
+        sun_y = math.cos(sun_el) * math.sin(sun_az)
+        sun_z = math.sin(sun_el)
+        
+        jup_x = math.cos(jup_el) * math.cos(jup_az)
+        jup_y = math.cos(jup_el) * math.sin(jup_az)
+        jup_z = math.sin(jup_el)
+        
+        # Calculate angular separation between Sun and Jupiter
+        dot_product = sun_x * jup_x + sun_y * jup_y + sun_z * jup_z
+        ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
+        
+        # Calculate blocked fraction
+        blocked = disk_overlap_fraction(sun_ang_rad, jup_ang_rad, ang_sep)
+        blocked_fractions.append(blocked)
+    
+    return blocked_fractions
 
 # GPT code
 def disk_overlap_fraction(r1, r2, d):
