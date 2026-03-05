@@ -26,9 +26,9 @@ def main():
     resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
     et = spice.utc2et("2021 Apr 25 16:25:12")
 
-    srfPoints = CreatePosArray(resolution, moon, et)
+    srfPoints = create_pos_array(resolution, moon, et)
     print(srfPoints)
-    jup_diskProps = GetDiskProperties(moon, "Jupiter", et, srfPoints)
+    jup_diskProps = get_disk_properties(moon, "Jupiter", et, srfPoints)
     print(jup_diskProps)
 
 
@@ -101,7 +101,8 @@ def get_disk_properties(observer, body, et, srf_points):
 
     for point in srf_points:
         #body_pos_rel_srf = np.subtract(body_pos[0], point) # This gives the vector from surface point to body center in the body fixed frame of the observer. 
-        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", "", "", point, observer, "IAU" + observer ) # This gives the azimuth, altitude and distance of the body as seen from the surface point.
+        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU" + observer ) # This gives the azimuth, altitude and distance of the body as seen from the surface point.
+        
         body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
         body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
         body_al = body_local_sph_pos[2] # This is the altitude of the body as seen from the point
