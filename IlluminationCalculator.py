@@ -12,6 +12,7 @@ test rev
 
 # Vidar Cardell Nahlbom, Andreas Jensen Herres
 # 2026
+# KEX L5
 
 def main():
     '''
@@ -73,9 +74,6 @@ def GetDiskProperties(observer, body, et, srfPoints):
     """
 
     Radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
-    #body_pos = spice.spkpos(body, et, "IAU_" + observer, "LT+S", observer)
-    # spkpos returns xyz coordinates, now in the body fixed frame of the observer, we want to convert this to local azimuth and altitude for every point.
-    # it also returns the light time, but we ignore this for now
 
     for point in srfPoints:
         #body_pos_rel_srf = np.subtract(body_pos[0], point) # This gives the vector from surface point to body center in the body fixed frame of the observer. 
