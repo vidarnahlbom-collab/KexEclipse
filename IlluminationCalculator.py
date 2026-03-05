@@ -2,6 +2,8 @@ import spiceypy as spice
 import os
 import math
 import numpy as np
+import time
+
 
 '''
 TODO:
@@ -23,7 +25,9 @@ def main():
     moon = select_moon()
     #moon = "Europa"
 
-    resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    start_time = time.time()
+
+    resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
     et = spice.utc2et("2021 Apr 25 16:25:12")
 
     srf_points = create_pos_array(resolution, moon, et)
@@ -31,6 +35,7 @@ def main():
     jup_disk_props = get_disk_properties(moon, "Jupiter", et, srf_points)
     sun_disk_props = get_disk_properties(moon, "Sun", et, srf_points)
 
+    print("Process finished --- %s seconds ---" % (time.time() - start_time))
 
 def furnish_kernels():
     '''
