@@ -3,6 +3,8 @@ import os
 import math
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 '''
@@ -39,7 +41,9 @@ def main():
     blocked_fractions = get_blocked_fractions(sun_disk_props, jup_disk_props)
 
     print(blocked_fractions)
-    print("Process finished --- %s seconds ---" % (time.time() - start_time))
+    #print("Process finished --- %s seconds ---" % (time.time() - start_time))
+    visualize_blocked_fractions(blocked_fractions, srf_points)
+
 
 def furnish_kernels():
     '''
@@ -194,6 +198,43 @@ def disk_overlap_fraction(r1, r2, d):
 
     overlap = part1 + part2 - part3
     return overlap / (np.pi * r1**2)
+
+# GPT code
+def visualize_blocked_fractions(blocked_fractions, srf_points, moon_radius=1560.8):
+    """
+    Visualize the blocked fractions on a sphere.
+    blocked_fractions: list of floats (0 to 1)
+    srf_points: Nx3 array of surface points in km
+    moon_radius: approximate radius of the moon (for scaling)
+    """
+
+    # Convert blocked fractions to grayscale (0=white, 1=black)
+    colors = [(1-b, 1-b, 1-b) for b in blocked_fractions]  # RGB tuples
+
+    # Extract coordinates
+    x = [p[0] for p in srf_points]
+    y = [p[1] for p in srf_points]
+    z = [p[2] for p in srf_points]
+
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_box_aspect([1,1,1])  # Equal aspect
+
+    # Plot surface points
+    ax.scatter(x, y, z, c=colors, s=20)
+
+    # Optional: plot a transparent sphere for context
+    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
+    xs = moon_radius * np.cos(u) * np.sin(v)
+    ys = moon_radius * np.sin(u) * np.sin(v)
+    zs = moon_radius * np.cos(v)
+    ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
+
+    ax.set_xlabel('X (km)')
+    ax.set_ylabel('Y (km)')
+    ax.set_zlabel('Z (km)')
+    ax.set_title('Sun Blocked Fraction on Moon Surface')
+    plt.show()
 
 
 if __name__ == '__main__':
