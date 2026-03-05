@@ -92,22 +92,21 @@ def create_pos_array(resolution, body, et):
 
 def get_disk_properties(observer, body, et, srf_points):
     """
-    Returns the Azimuth, Altitude and angular size of the body as seen from the surface points.
+    Returns the azimuth, elevation and angular size of the body as seen from the surface points.
     """
 
     radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
     disk_props = []
 
     for point in srf_points:
-        #body_pos_rel_srf = np.subtract(body_pos[0], point) # This gives the vector from surface point to body center in the body fixed frame of the observer. 
-        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU" + observer ) # This gives the azimuth, altitude and distance of the body as seen from the surface point.
+        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_" + observer ) # This gives the azimuth, elevation and distance of the body as seen from the surface point.
         
         body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
         body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
-        body_al = body_local_sph_pos[2] # This is the altitude of the body as seen from the point
+        body_el = body_local_sph_pos[2] # This is the elevation of the body as seen from the point
 
         body_ang_radius = math.atan(radii/body_dis) # In radians
-        disk_props.append([body_az, body_al, body_ang_radius])
+        disk_props.append([body_az, body_el, body_ang_radius])
     
     return disk_props
 
