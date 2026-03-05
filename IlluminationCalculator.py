@@ -18,17 +18,45 @@ def main():
     '''
     Huvudfunktionen som sköter programflödet
     '''
+    furnish_kernels()
+
+    moon = select_moon()
+    #moon = "Europa"
+
+    resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    et = spice.utc2et("2021 Apr 25 16:25:12")
+
+    srfPoints = CreatePosArray(resolution, moon, et)
+    print(srfPoints)
+    jup_diskProps = GetDiskProperties(moon, "Jupiter", et, srfPoints)
+    print(jup_diskProps)
+
+
+def furnish_kernels():
+    '''
+    Furnishar alla kernels
+    '''
     kernel_dir = "kernels"
     spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
     spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
 
-    resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    et = spice.utc2et("2021 Apr 25 16:25:12")
 
-    srf_points = create_pos_array(resolution, "Europa", et)
-    jup_disk_props = get_disk_properties("Europa", "Jupiter", et, srf_points)
+def select_moon():
+    '''
+    Frågar användaren efter en av de fyra galileiska månarna
+    '''
+    moons = ["Io", "Europa", "Ganymede", "Callisto"]
+
+    while True:
+        moon = input("Select moon: ").title()
+        if moon in moons:
+            break
+        print("INVALID")
+    
+    return moon
+
 
 def create_pos_array(resolution, body, et):
     'Given how many points you want and on what body, returns an array of surface points facing the sun at the given time'
