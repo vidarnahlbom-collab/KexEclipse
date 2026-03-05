@@ -29,6 +29,9 @@ def main():
     srf_points = create_pos_array(resolution, moon, et)
     
     jup_disk_props = get_disk_properties(moon, "Jupiter", et, srf_points)
+    sun_disk_props = get_disk_properties(moon, "Sun", et, srf_points)
+
+
 
 
 def furnish_kernels():
@@ -40,7 +43,6 @@ def furnish_kernels():
     spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
-
 
 def select_moon():
     '''
@@ -55,7 +57,6 @@ def select_moon():
         print("INVALID")
     
     return moon
-
 
 def create_pos_array(resolution, body, et):
     'Given how many points you want and on what body, returns an array of surface points facing the sun at the given time'
@@ -100,7 +101,6 @@ def get_disk_properties(observer, body, et, srf_points):
 
     for point in srf_points:
         body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_"+observer)[0] # This gives the azimuth, elevation and distance of the body as seen from the surface point.
-        
         body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
         body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
         body_el = body_local_sph_pos[2] # This is the elevation of the body as seen from the point
@@ -129,6 +129,36 @@ def get_disk_properties(observer, body, et, srf_points):
     target_wrt_surface = target_wrt_obs - surfPoints_j2000
 
     return target_wrt_surface """
+
+def angular_separation(disk_props_1, disk_props_2):
+    """
+    Given the disk properties of two bodies, calculates the angular separation between them as seen from the surface points.
+    """
+    ang_sep = []
+
+    for props1, props2 in zip(disk_props_1, disk_props_2):
+        az1, el1, _ = props1
+        az2, el2, _ = props2
+
+        # Convert to Cartesian coordinates
+        x1 = math.cos(el1) * math.cos(az1)
+        y1 = math.cos(el1) * math.sin(az1)
+        z1 = math.sin(el1)
+
+        x2 = math.cos(el2) * math.cos(az2)
+        y2 = math.cos(el2) * math.sin(az2)
+        z2 = math.sin(el2)
+
+        # Calculate the dot product and magnitudes
+        dot_product = x1 * x2 + y1 * y2 + z1 * z2
+        mag1 = math.sqrt(x1**2 + y1**2 + z1**2)
+        mag2 = math.sqrt(x2**2 + y2**2 + z2**2)
+
+        # Calculate the angular separation
+        cos_ang_sep = dot_product / (mag1 * mag2)
+        ang_sep.append(math.acos(cos_ang_sep))
+
+    return ang_sep
 
 if __name__ == '__main__':
     main()
