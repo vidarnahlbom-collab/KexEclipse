@@ -6,17 +6,13 @@ import time
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-
-'''
-TODO:
-CreatePosArray doing whole surface, account atleast for only half in sunlight.
-Redo using moon fixed body reference frame 
-test rev
-'''
-
 # Vidar Cardell Nahlbom, Andreas Jensen Herres
 # 2026-03-05
 # KEX L5
+
+"""
+Moon does not block itself
+"""
 
 def main():
     '''
@@ -30,9 +26,10 @@ def main():
     start_time = time.time()
 
     resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    utc = "2021 Apr 25 15:26:31"
+    utc = "2021 Apr 25 14:26:31"
     et = spice.utc2et(utc)
     print(utc)
+    
     srf_points = create_pos_array(resolution, moon, et)
     
     jup_disk_props = get_disk_properties(moon, "Jupiter", et, srf_points)
@@ -40,7 +37,6 @@ def main():
     
     blocked_fractions = get_blocked_fractions(sun_disk_props, jup_disk_props)
 
-    print(blocked_fractions)
     #print("Process finished --- %s seconds ---" % (time.time() - start_time))
     visualize_blocked_fractions(blocked_fractions, srf_points)
 
@@ -78,7 +74,7 @@ def create_pos_array(resolution, body, et):
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
 
     # Longitudes: only the longitudes of the half of the planetoid facing the sun
-    longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
+    longitudes = np.linspace(subsolar_lon-4*np.pi/8,subsolar_lon+4*np.pi/8,resolution,endpoint=True)
 
     # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole. 
     # We also ignore south and north pole as if they are included they will be included resolution times, one for every longitude.
@@ -124,26 +120,7 @@ def get_disk_properties(observer, body, et, srf_points):
     
     return disk_props
 
-    """ # srfLonLat is now relative planetoid, we want it relative J2000 because thats what spkpos uses
-
-    frame1 = "IAU_" + observer
     
-    # We get the rotation matrix needed to convert our planetoid positions to J2000 Inertial coordinates
-    rotMatrix = spice.pxform(frame1, "J2000", et)
-
-    # mkw can only handle 1 vector of 3 values, so we need to do the matrix multiplication ourselves to get all the points in J2000 coordinates
-    # We do this with numpy 
-    rot_np = np.array(rotMatrix)
-    pts_np = np.array(srfPoints)
-    surfPoints_j2000 = pts_np @ rot_np.T
-
-    spice.spkpos(body, et, "J2000", "LT+S", observer)
-
-    target_wrt_obs = spice.spkpos(body, et, "J2000", "LT+S", observer)[0]
-    target_wrt_surface = target_wrt_obs - surfPoints_j2000
-
-    return target_wrt_surface """
-
 # VSC code
 def get_blocked_fractions(sun_disk_props, jup_disk_props):
     """
