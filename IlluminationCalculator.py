@@ -12,11 +12,13 @@ from mpl_toolkits.mplot3d import Axes3D
 
 """
 Moon does not block itself
+Add time slider
+Make plot more smooth when moving
 """
 
 def main():
     '''
-    Huvudfunktionen som sköter programflödet
+    Main function defining program flow
     '''
     furnish_kernels()
 
@@ -26,7 +28,7 @@ def main():
     start_time = time.time()
 
     resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    utc = "2021 Apr 25 14:26:31"
+    utc = "2021 Apr 25 15:26:31"
     et = spice.utc2et(utc)
     print(utc)
     
@@ -37,13 +39,13 @@ def main():
     
     blocked_fractions = get_blocked_fractions(sun_disk_props, jup_disk_props)
 
-    #print("Process finished --- %s seconds ---" % (time.time() - start_time))
+    print("Process finished --- %s seconds ---" % (time.time() - start_time))
     visualize_blocked_fractions(blocked_fractions, srf_points)
 
 
 def furnish_kernels():
     '''
-    Furnishar alla kernels
+    Furnishes Kernals
     '''
     kernel_dir = "kernels"
     spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
@@ -54,7 +56,7 @@ def furnish_kernels():
 
 def select_moon():
     '''
-    Frågar användaren efter en av de fyra galileiska månarna
+    Asks user to select wanted moons
     '''
     moons = ["Io", "Europa", "Ganymede", "Callisto"]
 
@@ -68,7 +70,17 @@ def select_moon():
 
 
 def create_pos_array(resolution, body, et):
-    'Given how many points you want and on what body, returns an array of surface points facing the sun at the given time'
+    """
+    Returns an array of surface points facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame.
+
+    Args:
+        resolution (int): Number of points in each direction for surface point array, so total number of points is resolution^2
+        body (str): Name of the body to calculate surface points for (e.g. "Europa")
+        et (float): Ephemeris time for which to calculate surface points
+
+    Returns:
+        np.ndarray: Array of surface points in km, shape (resolution^2, 3)
+    """
     
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
@@ -90,75 +102,109 @@ def create_pos_array(resolution, body, et):
 
     srf_points = spice.latsrf("ellipsoid", body, et, "IAU_" + body, lonlat)
 
-    """ Claude Code, says something can go wrong
-    # spice.latsrf handles planetocentric coordinates fine, but linspace can break near ±π
-    # You could instead filter by dot product with the sun direction after generating a full grid
-    sun_dir = subsolar_point[0] / np.linalg.norm(subsolar_point[0])
-    # ... generate full lon/lat grid, then:
-    facing_sun = [pt for pt in srfPoints if np.dot(pt / np.linalg.norm(pt), sun_dir) > 0]
-    """
-
     return srf_points
 
 
 def get_disk_properties(observer, body, et, srf_points):
     """
     Returns the azimuth, elevation and angular size of the body as seen from the surface points.
+
+    Args:
+        observer (str): Name of the body surface points are on (e.g. "Europa")
+        body (str): Name of the body to calculate disk properties for (e.g. "Jupiter")
+        et (float): Ephemeris time for which to calculate disk properties
+        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
+
+    Returns:
+        list of list: List of [azimuth, elevation, angular radius] for each surface point
     """
+    # The azimuth is the angle between the projection onto the
+    # local topocentric principal (X-Y) plane of the vector
+    # from the observer's position to the target and the
+    # principal axis of the reference frame. The azimuth is
+    # zero on the +X axis.
+
+    # The elevation is the angle between the vector from the
+    # observer's position to the target and the local
+    # topocentric principal plane. The elevation is zero on
+    # the plane.
+
+    # The topocentric principal plane is:
+    # +Z = outward surface normal (straight up from the surface)
+    # +X = points toward the body's north pole (projected onto the local horizon plane)
+    # +Y = completes the right-hand system (so roughly "east")
+
+    # This does not quite work at the poles, but these are not included in our surface point array so it should be fine.
 
     radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
     disk_props = []
 
     for point in srf_points:
-        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_"+observer)[0] # This gives the azimuth, elevation and distance of the body as seen from the surface point.
-        body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
-        body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
-        body_el = body_local_sph_pos[2] # This is the elevation of the body as seen from the point
+        dis, az, el = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_"+observer)[0] 
+        # This gives the azimuth, elevation and distance of the body as seen from the surface point. 
+        # The False then True flags means that azimuth is increasing clockwise, elevation is increasing from XY plane to +Z
 
-        body_ang_radius = math.atan(radii/body_dis) # In radians
-        disk_props.append([body_az, body_el, body_ang_radius])
-    
+        ang_radius = math.atan(radii/dis) # In radians
+        disk_props.append([az, el, ang_radius])
+    # This can all be done with normalized cartesian cooordinates and vectors instead since the next step
+    # get_blocked_fractions just converts straight back to normalized cartesian coordinates to calculate the angular separation, but this is simpler to understand and the performance should be fine for our purposes.
+    # It will also be easier if we eventually implement visualization of the disk positions and sizes on the sky as seen from the surface points, which could be a nice addition to the project.
+
     return disk_props
 
     
-# VSC code
-def get_blocked_fractions(sun_disk_props, jup_disk_props):
+# VSC code heavily edited by Vidar
+def get_blocked_fractions(body1_disk_props, body2_disk_props):
     """
-    Calculates what fraction of the Sun is blocked by Jupiter at each surface point.
+    Calculates what fraction of body1 is blocked by body2 at each surface point.
+
+    Args:
+        body1_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body1 (e.g. Sun)
+        body2_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body2 (e.g. Jupiter)
+
+    Returns:
+        list of float: List of blocked fractions (0 to 1) for each surface point, 0 means body1 not blocked at all
     """
+    # +Z = outward surface normal (straight up from the surface)
+    # +X = points toward the body's north pole (projected onto the local horizon plane)
+    # +Y = completes the right-hand system (so roughly "east")
+
+    # The disk properties are given as azimuth, elevation and angular radius for each surface point.
+    # When we convert these to normalized cartesian coordinates the conversion can be thought of as follows:
+    # The XYZ coordinates of the body center as seen from the where you are standing on the surface with XYZ defined as above. 
+
     blocked_fractions = []
     
-    for sun_props, jup_props in zip(sun_disk_props, jup_disk_props):
-        sun_az, sun_el, sun_ang_rad = sun_props
-        jup_az, jup_el, jup_ang_rad = jup_props
+    for body1_props, body2_props in zip(body1_disk_props, body2_disk_props):
+        # Zip iterates both body1 and body2 properties together, so we get the properties for the same surface point at the same time.
+        # Extract azimuth, elevation and angular radius for both bodies
+        body1_az, body1_el, body1_ang_rad = body1_props
+        body2_az, body2_el, body2_ang_rad = body2_props
         
         # Convert azimuth and elevation to Cartesian coordinates
-        sun_x = math.cos(sun_el) * math.cos(sun_az)
-        sun_y = math.cos(sun_el) * math.sin(sun_az)
-        sun_z = math.sin(sun_el)
+        body1_x = math.cos(body1_el) * math.cos(body1_az)
+        body1_y = math.cos(body1_el) * math.sin(body1_az)
+        body1_z = math.sin(body1_el)
         
-        jup_x = math.cos(jup_el) * math.cos(jup_az)
-        jup_y = math.cos(jup_el) * math.sin(jup_az)
-        jup_z = math.sin(jup_el)
+        body2_x = math.cos(body2_el) * math.cos(body2_az)
+        body2_y = math.cos(body2_el) * math.sin(body2_az)
+        body2_z = math.sin(body2_el)
         
-        # Calculate angular separation between Sun and Jupiter
-        dot_product = sun_x * jup_x + sun_y * jup_y + sun_z * jup_z
+        # Calculate angular separation between body1 and body2
+        # The dot product of the two unit vectors gives the cosine of the angle between them, so we can use arccos to get the angle.
+        # We also clip the dot product to the range [-1, 1] to avoid numerical issues with arccos that could arise due to for example floating point errors.
+        dot_product = body1_x * body2_x + body1_y * body2_y + body1_z * body2_z
         ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
         
         # Calculate blocked fraction
-        blocked = disk_overlap_fraction(sun_ang_rad, jup_ang_rad, ang_sep)
+        blocked = disk_overlap_fraction(body1_ang_rad, body2_ang_rad, ang_sep)
         blocked_fractions.append(blocked)
     
     return blocked_fractions
 
 # GPT code
 def disk_overlap_fraction(r1, r2, d):
-    """
-    Fraction of disk 1 (Sun) covered by disk 2 (Jupiter)
-    r1 = angular radius sun
-    r2 = angular radius jupiter
-    d  = angular separation
-    """
+    """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
 
     if d >= r1 + r2:
         return 0.0
