@@ -26,10 +26,9 @@ def main():
     resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
     et = spice.utc2et("2021 Apr 25 16:25:12")
 
-    srfPoints = create_pos_array(resolution, moon, et)
-    print(srfPoints)
-    jup_diskProps = get_disk_properties(moon, "Jupiter", et, srfPoints)
-    print(jup_diskProps)
+    srf_points = create_pos_array(resolution, moon, et)
+    
+    jup_disk_props = get_disk_properties(moon, "Jupiter", et, srf_points)
 
 
 def furnish_kernels():
