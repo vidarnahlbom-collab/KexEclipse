@@ -27,12 +27,10 @@ def main():
     resolution = 5 # Number of points in each direction for surface point array, so total number of points is resolution^2
     et = spice.utc2et("2021 Apr 25 16:25:12")
 
-    srfPoints = CreatePosArray(resolution, "Europa", et)
-    print(srfPoints)
-    jup_diskProps = GetDiskProperties("Europa", "Jupiter", et, srfPoints)
-    print(jup_diskProps)
+    srf_points = create_pos_array(resolution, "Europa", et)
+    jup_disk_props = get_disk_properties("Europa", "Jupiter", et, srf_points)
 
-def CreatePosArray(resolution, body, et):
+def create_pos_array(resolution, body, et):
     'Given how many points you want and on what body, returns an array of surface points facing the sun at the given time'
     
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
@@ -53,9 +51,7 @@ def CreatePosArray(resolution, body, et):
     #print(lonlat)
     # Now we put this into spice.latsrf. lonlat will be parsed as planetocentric 
 
-    fixref = "IAU_" + body
-
-    srfPoints = spice.latsrf("ellipsoid", body, et, fixref, lonlat)
+    srf_points = spice.latsrf("ellipsoid", body, et, "IAU_" + body, lonlat)
 
     """ Claude Code, says something can go wrong
     # spice.latsrf handles planetocentric coordinates fine, but linspace can break near ±π
@@ -65,26 +61,27 @@ def CreatePosArray(resolution, body, et):
     facing_sun = [pt for pt in srfPoints if np.dot(pt / np.linalg.norm(pt), sun_dir) > 0]
     """
 
-    
-    return srfPoints
+    return srf_points
 
-def GetDiskProperties(observer, body, et, srfPoints):
+def get_disk_properties(observer, body, et, srf_points):
     """
     Returns the Azimuth, Altitude and angular size of the body as seen from the surface points.
     """
 
-    Radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
+    radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
+    disk_props = []
 
-    for point in srfPoints:
+    for point in srf_points:
         #body_pos_rel_srf = np.subtract(body_pos[0], point) # This gives the vector from surface point to body center in the body fixed frame of the observer. 
         body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", "", "", point, observer, "IAU" + observer ) # This gives the azimuth, altitude and distance of the body as seen from the surface point.
         body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
-        body_Az = body_local_sph_pos[1] # This is the azimuthof the body as seen from the point
-        body_Al = body_local_sph_pos[2] # This is the altitude of the body as seen from the point
+        body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
+        body_al = body_local_sph_pos[2] # This is the altitude of the body as seen from the point
 
-        body_ang_radius = math.atan(Radii/body_dis) # In radians
-        diskprops = [body_Az, body_Al, body_ang_radius]
-        return diskprops
+        body_ang_radius = math.atan(radii/body_dis) # In radians
+        disk_props.append([body_az, body_al, body_ang_radius])
+    
+    return disk_props
 
     """ # srfLonLat is now relative planetoid, we want it relative J2000 because thats what spkpos uses
 
@@ -105,44 +102,6 @@ def GetDiskProperties(observer, body, et, srfPoints):
     target_wrt_surface = target_wrt_obs - surfPoints_j2000
 
     return target_wrt_surface """
-
-# REMOVE BELOW JUST FOR TESTING PURPOSES, MADE BY AI
-def CelestialSpherePosFinder(observer, body, et, srfPoints):
-    'Given time and positions return the apparent size and location of desired body in the celestial sphere at all positions'
-
-    target_wrt_surface = BodyPosRelativeSrfPos(observer, body, et, srfPoints)
-
-    # We want to convert this to right ascension and declination for every point. 
-    # We can do this by normalizing the vector and then using arcsin and arctan to get the angles. 
-
-    target_wrt_surface_normalized = target_wrt_surface / np.linalg.norm(target_wrt_surface, axis=1)[:, np.newaxis]
-
-    # Declination is arcsin of z component
-    declination = np.arcsin(target_wrt_surface_normalized[:, 2])
-
-    # Right ascension is arctan of y/x components
-    right_ascension = np.arctan2(target_wrt_surface_normalized[:, 1], target_wrt_surface_normalized[:, 0])
-
-    # We can return these as a 2D array where each row is a point and the columns are right ascension and declination
-    celestial_sphere_pos = np.column_stack((right_ascension, declination))
-
-    return celestial_sphere_pos
-
-def AngularSeparation(pos1, pos2):
-    'Given two positions in the celestial sphere, return the angular separation between them'
-
-    # We can use the haversine formula to calculate the angular separation between two points on a sphere given their right ascension and declination
-
-    ra1, dec1 = pos1
-    ra2, dec2 = pos2
-
-    delta_ra = ra2 - ra1
-    delta_dec = dec2 - dec1
-
-    a = np.sin(delta_dec / 2)**2 + np.cos(dec1) * np.cos(dec2) * np.sin(delta_ra / 2)**2
-    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-
-    return c
 
 if __name__ == '__main__':
     main()
