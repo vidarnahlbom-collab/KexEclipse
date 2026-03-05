@@ -200,5 +200,31 @@ def sun_blocked_fraction(p, et):
     return disk_overlap_fraction(r1, r2, d)
 
 
+# GPT code
+def disk_overlap_fraction(r1, r2, d):
+    """
+    Fraction of disk 1 (Sun) covered by disk 2 (Jupiter)
+    r1 = angular radius sun
+    r2 = angular radius jupiter
+    d  = angular separation
+    """
+
+    if d >= r1 + r2:
+        return 0.0
+
+    if d <= abs(r1 - r2):
+        if r2 >= r1:
+            return 1.0
+        else:
+            return (np.pi * r2**2) / (np.pi * r1**2)
+
+    part1 = r1**2 * np.arccos((d**2 + r1**2 - r2**2) / (2*d*r1))
+    part2 = r2**2 * np.arccos((d**2 + r2**2 - r1**2) / (2*d*r2))
+    part3 = 0.5 * np.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2))
+
+    overlap = part1 + part2 - part3
+    return overlap / (np.pi * r1**2)
+
+
 if __name__ == '__main__':
     main()
