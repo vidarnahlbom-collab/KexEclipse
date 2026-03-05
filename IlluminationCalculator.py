@@ -10,7 +10,13 @@ Redo using moon fixed body reference frame
 test rev
 '''
 
+# Vidar Cardell Nahlbom, Andreas Jensen Herres
+# 2026
+
 def main():
+    '''
+    Huvudfunktionen som sköter programflödet
+    '''
     kernel_dir = "kernels"
     spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
     spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
