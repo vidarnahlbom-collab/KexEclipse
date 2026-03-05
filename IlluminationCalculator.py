@@ -54,24 +54,23 @@ def CreatePosArray(resolution, body, et):
 
 def GetDiskProperties(observer, body, et, srfPoints):
     """
-    Returns the Right Ascension, Declination and angular size of the body as seen from the surface points.
+    Returns the Azimuth, Altitude and angular size of the body as seen from the surface points.
     """
 
     Radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
     body_pos = spice.spkpos(body, et, "IAU_" + observer, "LT+S", observer)
+    # spkpos returns xyz coordinates, now in the body fixed frame of the observer, we want to convert this to local azimuth and altitude for every point.
+    # it also returns the light time, but we ignore this for now
 
-    # THIS IS INCORRECT FOR NOW, WHAT COORDINATE SYSTEM DOES recrad give? need local coordinate system for the celestial sphere as seen from observer point. 
     for point in srfPoints:
-        body_pos_rel_srf = np.subtract(body_pos[0], point)
-        # spkpos returns xyz coordinates, now in the body fixed frame of the observer, we want to convert this to right ascension and declination for every point.
-        # it also returns the light time, but we ignore this for now
-        body_rad_pos = spice.recrad(body_pos_rel_srf) # This converts the rectangular coordinates to spherical coordinates, we only need the distance for the angular size calculation, and the right ascension and declination for the disk center position
-        body_dis = body_rad_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
-        body_RA = body_rad_pos[1] # This is the right ascension of the body as seen from the point
-        body_Dec = body_rad_pos[2] # This is the declination of the body as seen from the point
+        body_pos_rel_srf = np.subtract(body_pos[0], point) # This gives the vector from surface point to body center in the body fixed frame of the observer. 
+        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", "",x, point, x, "IAU" + observer ) # This gives the azimuth, altitude and distance of the body as seen from the surface point.
+        body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
+        body_Az = body_local_sph_pos[1] # This is the azimuthof the body as seen from the point
+        body_Al = body_local_sph_pos[2] # This is the altitude of the body as seen from the point
 
         body_ang_radius = math.atan(Radii/body_dis) # In radians
-        diskprops = [body_RA, body_Dec, body_ang_radius]
+        diskprops = [body_Az, body_Al, body_ang_radius])
         return diskprops
 
     """ # srfLonLat is now relative planetoid, we want it relative J2000 because thats what spkpos uses
