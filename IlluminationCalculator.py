@@ -135,21 +135,27 @@ def get_disk_properties(observer, body, et, srf_points):
     # +Y = completes the right-hand system (so roughly "east")
 
     # This does not quite work at the poles, but these are not included in our surface point array so it should be fine.
+    
+    # This can all be done with normalized cartesian cooordinates and vectors instead since the next step
+    # get_blocked_fractions just converts straight back to normalized cartesian coordinates to calculate the angular separation, but this is simpler to understand and the performance should be fine for our purposes.
+    # It will also be easier if we eventually implement visualization of the disk positions and sizes on the sky as seen from the surface points, which could be a nice addition to the project.
+
 
     radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
     disk_props = []
 
     for point in srf_points:
-        dis, az, el = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_"+observer)[0] 
-        # This gives the azimuth, elevation and distance of the body as seen from the surface point. 
+        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_"+observer)[0] 
+        # This gives the azimuth, elevation and distance of the body as seen from the surface point.
         # The False then True flags means that azimuth is increasing clockwise, elevation is increasing from XY plane to +Z
 
-        ang_radius = math.atan(radii/dis) # In radians
-        disk_props.append([az, el, ang_radius])
-    # This can all be done with normalized cartesian cooordinates and vectors instead since the next step
-    # get_blocked_fractions just converts straight back to normalized cartesian coordinates to calculate the angular separation, but this is simpler to understand and the performance should be fine for our purposes.
-    # It will also be easier if we eventually implement visualization of the disk positions and sizes on the sky as seen from the surface points, which could be a nice addition to the project.
+        body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
+        body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
+        body_el = body_local_sph_pos[2] # This is the elevation of the body as seen from the point
 
+        body_ang_radius = math.atan(radii/body_dis) # In radians
+        disk_props.append([body_az, body_el, body_ang_radius])
+  
     return disk_props
 
     
