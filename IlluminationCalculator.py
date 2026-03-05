@@ -32,8 +32,6 @@ def main():
     sun_disk_props = get_disk_properties(moon, "Sun", et, srf_points)
 
 
-
-
 def furnish_kernels():
     '''
     Furnishar alla kernels
@@ -43,6 +41,7 @@ def furnish_kernels():
     spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
     spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
+
 
 def select_moon():
     '''
@@ -57,6 +56,7 @@ def select_moon():
         print("INVALID")
     
     return moon
+
 
 def create_pos_array(resolution, body, et):
     'Given how many points you want and on what body, returns an array of surface points facing the sun at the given time'
@@ -90,6 +90,7 @@ def create_pos_array(resolution, body, et):
     """
 
     return srf_points
+
 
 def get_disk_properties(observer, body, et, srf_points):
     """
@@ -130,6 +131,7 @@ def get_disk_properties(observer, body, et, srf_points):
 
     return target_wrt_surface """
 
+
 def angular_separation(disk_props_1, disk_props_2):
     """
     Given the disk properties of two bodies, calculates the angular separation between them as seen from the surface points.
@@ -159,6 +161,7 @@ def angular_separation(disk_props_1, disk_props_2):
         ang_sep.append(math.acos(cos_ang_sep))
 
     return ang_sep
+
 
 if __name__ == '__main__':
     main()
