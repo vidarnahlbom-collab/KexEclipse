@@ -163,5 +163,42 @@ def angular_separation(disk_props_1, disk_props_2):
     return ang_sep
 
 
+# GPT code
+def sun_blocked_fraction(p, et):
+    """
+    p  = position of observer relative to moon center (km) in moon-fixed frame
+    et = ephemeris time
+    """
+
+    moon = "EUROPA"   # change if needed
+    frame = "IAU_EUROPA"
+
+    # position of Sun and Jupiter relative to moon center
+    sun_state, _ = spice.spkezr("SUN", et, frame, "LT+S", moon)
+    jup_state, _ = spice.spkezr("JUPITER", et, frame, "LT+S", moon)
+
+    sun_vec = sun_state[:3] - p
+    jup_vec = jup_state[:3] - p
+
+    sun_dist = np.linalg.norm(sun_vec)
+    jup_dist = np.linalg.norm(jup_vec)
+
+    sun_dir = sun_vec / sun_dist
+    jup_dir = jup_vec / jup_dist
+
+    # angular separation
+    d = np.arccos(np.clip(np.dot(sun_dir, jup_dir), -1.0, 1.0))
+
+    # radii from kernels
+    sun_rad = spice.bodvrd("SUN", "RADII", 3)[1][0]
+    jup_rad = spice.bodvrd("JUPITER", "RADII", 3)[1][0]
+
+    # angular radii
+    r1 = np.arcsin(sun_rad / sun_dist)
+    r2 = np.arcsin(jup_rad / jup_dist)
+
+    return disk_overlap_fraction(r1, r2, d)
+
+
 if __name__ == '__main__':
     main()
