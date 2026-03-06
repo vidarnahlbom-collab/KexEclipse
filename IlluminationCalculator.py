@@ -29,11 +29,11 @@ def main():
 
     start_time = time.time()
 
-    resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
     #utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
-    #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
-    utc = "2015 Jan 24 05:16:22" # 2 shadow transits in the same spot on jupiter with io and callisto
+    utc = "2015 Jan 24 06:09:19" # Triple shadow transit
+    #utc = "2015 Jan 24 05:16:22" # 2 shadow transits in the same spot on jupiter with io and callisto
     et = spice.utc2et(utc)
     print(utc)
     
@@ -41,14 +41,14 @@ def main():
     srf_points = create_pos_array(resolution, observer, et)
     
     # Get the disk properties of the sun and blockers as seen from the surface points.
-    sun_disk_props = get_disk_properties(observer, "Sun", et, srf_points)
+    sun_disk_props = get_disk_properties_cartesian(observer, "Sun", et, srf_points)
 
     total_blocked = np.zeros(len(srf_points))
     # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
     for blocker in blockers:
         print(f"Calculating blocked fractions for {blocker}...")
-        blocker_disk_props = get_disk_properties(observer, blocker, et, srf_points)
-        blocked_fractions = get_blocked_fractions(sun_disk_props, blocker_disk_props)
+        blocker_disk_props = get_disk_properties_cartesian(observer, blocker, et, srf_points)
+        blocked_fractions = get_blocked_fractions_cartesian(sun_disk_props, blocker_disk_props)
         total_blocked = np.clip(total_blocked + blocked_fractions, 0.0, 1.0)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
@@ -126,7 +126,86 @@ def create_pos_array(resolution, body, et):
     return srf_points
 
 
-def get_disk_properties(observer, body, et, srf_points):
+def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
+    blocked_fractions = []
+    
+    for body1_props, body2_props in zip(body1_disk_props, body2_disk_props):
+        body1_x, body1_y, body1_z, body1_ang_rad = body1_props
+        body2_x, body2_y, body2_z, body2_ang_rad = body2_props
+
+        dot_product = body1_x * body2_x + body1_y * body2_y + body1_z * body2_z
+        ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
+
+        blocked = disk_overlap_fraction(body1_ang_rad, body2_ang_rad, ang_sep)
+        blocked_fractions.append(blocked)
+    
+    return blocked_fractions
+
+
+def get_disk_properties_cartesian(observer, body, et, srf_points):
+    radii = spice.bodvrd(body, "RADII", 3)[1][0]
+    local_normalized_cartesian_coords = []
+
+    for point in srf_points:
+        body_local_xyz_pos = spice.spkcpo(body, et, "IAU_"+observer, "OBSERVER", "LT+S", point, observer, "IAU_"+observer)[0]
+
+        body_dis = math.sqrt(body_local_xyz_pos[0]**2 + body_local_xyz_pos[1]**2 + body_local_xyz_pos[2]**2)
+        body_ang_radius = math.atan(radii/body_dis) # In radians
+        local_normalized_cartesian_coords.append([body_local_xyz_pos[0]/body_dis, body_local_xyz_pos[1]/body_dis, body_local_xyz_pos[2]/body_dis, body_ang_radius])
+
+    return local_normalized_cartesian_coords
+
+# VSC code heavily edited by Vidar
+def get_blocked_fractions_radial(body1_disk_props, body2_disk_props):
+    """
+    Calculates what fraction of body1 is blocked by body2 at each surface point.
+
+    Args:
+        body1_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body1 (e.g. Sun)
+        body2_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body2 (e.g. Jupiter)
+
+    Returns:
+        list of float: List of blocked fractions (0 to 1) for each surface point, 0 means body1 not blocked at all
+    """
+    # +Z = outward surface normal (straight up from the surface)
+    # +X = points toward the body's north pole (projected onto the local horizon plane)
+    # +Y = completes the right-hand system (so roughly "east")
+
+    # The disk properties are given as azimuth, elevation and angular radius for each surface point.
+    # When we convert these to normalized cartesian coordinates the conversion can be thought of as follows:
+    # The XYZ coordinates of the body center as seen from the where you are standing on the surface with XYZ defined as above. 
+
+    blocked_fractions = []
+    
+    for body1_props, body2_props in zip(body1_disk_props, body2_disk_props):
+        # Zip iterates both body1 and body2 properties together, so we get the properties for the same surface point at the same time.
+        # Extract azimuth, elevation and angular radius for both bodies
+        body1_az, body1_el, body1_ang_rad = body1_props
+        body2_az, body2_el, body2_ang_rad = body2_props
+        
+        # Convert azimuth and elevation to Cartesian coordinates
+        body1_x = math.cos(body1_el) * math.cos(body1_az)
+        body1_y = math.cos(body1_el) * math.sin(body1_az)
+        body1_z = math.sin(body1_el)
+        
+        body2_x = math.cos(body2_el) * math.cos(body2_az)
+        body2_y = math.cos(body2_el) * math.sin(body2_az)
+        body2_z = math.sin(body2_el)
+        
+        # Calculate angular separation between body1 and body2
+        # The dot product of the two unit vectors gives the cosine of the angle between them, so we can use arccos to get the angle.
+        # We also clip the dot product to the range [-1, 1] to avoid numerical issues with arccos that could arise due to for example floating point errors.
+        dot_product = body1_x * body2_x + body1_y * body2_y + body1_z * body2_z
+        ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
+        
+        # Calculate blocked fraction
+        blocked = disk_overlap_fraction(body1_ang_rad, body2_ang_rad, ang_sep)
+        blocked_fractions.append(blocked)
+    
+    return blocked_fractions
+
+
+def get_disk_properties_radial(observer, body, et, srf_points):
     """
     Returns the azimuth, elevation and angular size of the body as seen from the surface points.
 
@@ -178,56 +257,6 @@ def get_disk_properties(observer, body, et, srf_points):
         disk_props.append([body_az, body_el, body_ang_radius])
   
     return disk_props
-
-    
-# VSC code heavily edited by Vidar
-def get_blocked_fractions(body1_disk_props, body2_disk_props):
-    """
-    Calculates what fraction of body1 is blocked by body2 at each surface point.
-
-    Args:
-        body1_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body1 (e.g. Sun)
-        body2_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body2 (e.g. Jupiter)
-
-    Returns:
-        list of float: List of blocked fractions (0 to 1) for each surface point, 0 means body1 not blocked at all
-    """
-    # +Z = outward surface normal (straight up from the surface)
-    # +X = points toward the body's north pole (projected onto the local horizon plane)
-    # +Y = completes the right-hand system (so roughly "east")
-
-    # The disk properties are given as azimuth, elevation and angular radius for each surface point.
-    # When we convert these to normalized cartesian coordinates the conversion can be thought of as follows:
-    # The XYZ coordinates of the body center as seen from the where you are standing on the surface with XYZ defined as above. 
-
-    blocked_fractions = []
-    
-    for body1_props, body2_props in zip(body1_disk_props, body2_disk_props):
-        # Zip iterates both body1 and body2 properties together, so we get the properties for the same surface point at the same time.
-        # Extract azimuth, elevation and angular radius for both bodies
-        body1_az, body1_el, body1_ang_rad = body1_props
-        body2_az, body2_el, body2_ang_rad = body2_props
-        
-        # Convert azimuth and elevation to Cartesian coordinates
-        body1_x = math.cos(body1_el) * math.cos(body1_az)
-        body1_y = math.cos(body1_el) * math.sin(body1_az)
-        body1_z = math.sin(body1_el)
-        
-        body2_x = math.cos(body2_el) * math.cos(body2_az)
-        body2_y = math.cos(body2_el) * math.sin(body2_az)
-        body2_z = math.sin(body2_el)
-        
-        # Calculate angular separation between body1 and body2
-        # The dot product of the two unit vectors gives the cosine of the angle between them, so we can use arccos to get the angle.
-        # We also clip the dot product to the range [-1, 1] to avoid numerical issues with arccos that could arise due to for example floating point errors.
-        dot_product = body1_x * body2_x + body1_y * body2_y + body1_z * body2_z
-        ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
-        
-        # Calculate blocked fraction
-        blocked = disk_overlap_fraction(body1_ang_rad, body2_ang_rad, ang_sep)
-        blocked_fractions.append(blocked)
-    
-    return blocked_fractions
 
 # GPT code commented and understood, but just math
 def disk_overlap_fraction(r1, r2, d):
