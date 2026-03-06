@@ -22,25 +22,35 @@ def main():
     '''
     furnish_kernels()
 
-    #moon = select_moon()
-    moon = "Europa"
+    observer, blockers = select_bodies()
+    #moon = "Europa"
 
     start_time = time.time()
 
-    resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    utc = "2021 Apr 25 15:26:31"
+    resolution = 200 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    #utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
+    #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
+    #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
+    utc = "2015 Jan 24 05:16:22" # 2 shadow transits in the same spot on jupiter with io and callisto
     et = spice.utc2et(utc)
     print(utc)
     
-    srf_points = create_pos_array(resolution, moon, et)
+    # Create array of actual surface points on observer body facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame. This is needed for the next step to calculate the disk properties of the sun and blockers as seen from these points, which is needed to calculate the blocked fractions.
+    srf_points = create_pos_array(resolution, observer, et)
     
-    jup_disk_props = get_disk_properties(moon, "Jupiter", et, srf_points)
-    sun_disk_props = get_disk_properties(moon, "Sun", et, srf_points)
-    
-    blocked_fractions = get_blocked_fractions(sun_disk_props, jup_disk_props)
+    # Get the disk properties of the sun and blockers as seen from the surface points.
+    sun_disk_props = get_disk_properties(observer, "Sun", et, srf_points)
+
+    total_blocked = np.zeros(len(srf_points))
+    # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
+    for blocker in blockers:
+        print(f"Calculating blocked fractions for {blocker}...")
+        blocker_disk_props = get_disk_properties(observer, blocker, et, srf_points)
+        blocked_fractions = get_blocked_fractions(sun_disk_props, blocker_disk_props)
+        total_blocked = np.clip(total_blocked + blocked_fractions, 0.0, 1.0)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
-    visualize_blocked_fractions(blocked_fractions, srf_points)
+    visualize_blocked_fractions(total_blocked, srf_points, observer, blockers)
 
 
 def furnish_kernels():
@@ -54,19 +64,28 @@ def furnish_kernels():
     spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
 
 
-def select_moon():
+def select_bodies():
     '''
-    Asks user to select wanted moons
+    Asks user to select wanted moons and blockers
     '''
-    moons = ["Io", "Europa", "Ganymede", "Callisto"]
-
+    bodies = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
+    print("Available bodies: " + ", ".join(bodies))
     while True:
-        moon = input("Select moon: ").capitalize()
-        if moon in moons:
+        observer = input("Select observer: ").capitalize().strip()
+        if observer in bodies:
             break
         print("INVALID")
-    
-    return moon
+    while True:
+        blockers = input("Select obstructing bodies (separated by commas, enter for all): ").split(",")
+        if blockers == [""]:
+            blockers = [b for b in bodies if b != observer] # If user presses enter, all other bodies are blockers
+            break
+        blockers = [b.strip().capitalize() for b in blockers] # Remove extra whitespace and capital letters
+        if all(blocker in bodies and blocker != observer for blocker in blockers):
+            break
+        print("INVALID")
+
+    return observer, blockers
 
 
 def create_pos_array(resolution, body, et):
@@ -208,33 +227,37 @@ def get_blocked_fractions(body1_disk_props, body2_disk_props):
     
     return blocked_fractions
 
-# GPT code
+# GPT code commented and understood, but just math
 def disk_overlap_fraction(r1, r2, d):
     """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
 
+    # Check if any overlap is possible
     if d >= r1 + r2:
         return 0.0
 
+    # Check if one disk is completely inside the other
     if d <= abs(r1 - r2):
-        if r2 >= r1:
+        if r2 >= r1: # if r2 is larger than r1, then r1 is completely blocked
             return 1.0
-        else:
+        else: # if not then r2 is seen inside r1 and the blocked fraction is the area of r2 divided by the area of r1
             return (np.pi * r2**2) / (np.pi * r1**2)
 
+    # If there instead is partial overlap. We use some already existing mathematical method to calculate the overlap
     part1 = r1**2 * np.arccos((d**2 + r1**2 - r2**2) / (2*d*r1))
     part2 = r2**2 * np.arccos((d**2 + r2**2 - r1**2) / (2*d*r2))
     part3 = 0.5 * np.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2))
 
     overlap = part1 + part2 - part3
-    return overlap / (np.pi * r1**2)
+    return overlap / (np.pi * r1**2) # Finally, normalize by the area of body1 to get the blocked fraction
 
-# GPT code
-def visualize_blocked_fractions(blocked_fractions, srf_points, moon_radius=1560.8):
+# GPT code, due to change since slow and no time slider
+def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blockers):
     """
-    Visualize the blocked fractions on a sphere.
-    blocked_fractions: list of floats (0 to 1)
-    srf_points: Nx3 array of surface points in km
-    moon_radius: approximate radius of the moon (for scaling)
+    Visualize solar eclipse on planetoid surface
+
+    Args:
+        blocked_fractions (list of float): List of blocked fractions (0 to 1) for each surface point, 0 means sun not blocked at all
+        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
     """
 
     # Convert blocked fractions to grayscale (0=white, 1=black)
@@ -252,17 +275,10 @@ def visualize_blocked_fractions(blocked_fractions, srf_points, moon_radius=1560.
     # Plot surface points
     ax.scatter(x, y, z, c=colors, s=20)
 
-    # Optional: plot a transparent sphere for context
-    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
-    xs = moon_radius * np.cos(u) * np.sin(v)
-    ys = moon_radius * np.sin(u) * np.sin(v)
-    zs = moon_radius * np.cos(v)
-    ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
-
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
     ax.set_zlabel('Z (km)')
-    ax.set_title('Sun Blocked Fraction on Moon Surface')
+    ax.set_title(f'Sun Blocked Fraction on {observer} Surface\nBlockers: {", ".join(blockers)}')
     plt.show()
 
 
