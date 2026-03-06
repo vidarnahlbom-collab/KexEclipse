@@ -14,6 +14,8 @@ from mpl_toolkits.mplot3d import Axes3D
 Moon does not block itself
 Add time slider
 Make plot more smooth when moving
+
+model moon exosphere via a plane facing the sun, with lower resolution to show shadow moving and also in large scale around the moon
 """
 
 def main():
@@ -260,6 +262,8 @@ def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blocker
         srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
     """
 
+    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0]
+
     # Convert blocked fractions to grayscale (0=white, 1=black)
     colors = [(1-b, 1-b, 1-b) for b in blocked_fractions]  # RGB tuples
 
@@ -274,6 +278,13 @@ def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blocker
 
     # Plot surface points
     ax.scatter(x, y, z, c=colors, s=20)
+
+    # Optional: plot a transparent sphere for context
+    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
+    xs = observer_radius * np.cos(u) * np.sin(v)
+    ys = observer_radius * np.sin(u) * np.sin(v)
+    zs = observer_radius * np.cos(v)
+    ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
 
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
