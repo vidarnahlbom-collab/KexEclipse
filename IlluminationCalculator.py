@@ -29,7 +29,7 @@ def main():
 
     start_time = time.time()
 
-    resolution = 200 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
     #utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
     #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
@@ -262,7 +262,7 @@ def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blocker
         srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
     """
 
-    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0]
+    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.95
 
     # Convert blocked fractions to grayscale (0=white, 1=black)
     colors = [(1-b, 1-b, 1-b) for b in blocked_fractions]  # RGB tuples
