@@ -4,6 +4,7 @@ import math
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
 from mpl_toolkits.mplot3d import Axes3D
 
 # Vidar Cardell Nahlbom, Andreas Jensen Herres
@@ -24,35 +25,53 @@ def main():
     '''
     furnish_kernels()
 
-    observer, blockers = select_bodies()
-    #moon = "Europa"
+    #observer, blockers = select_bodies()
+    observer, blockers = "Europa", ["Jupiter"]
 
     start_time = time.time()
 
-    resolution = 100 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    #utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
+    resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
-    utc = "2015 Jan 24 06:09:19" # Triple shadow transit
+    #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
     #utc = "2015 Jan 24 05:16:22" # 2 shadow transits in the same spot on jupiter with io and callisto
-    et = spice.utc2et(utc)
+    et = int(spice.utc2et(utc))
     print(utc)
     
+    '''
+    total_blocked, srf_points = blocked_moment(resolution, observer, blockers, et)
+    '''
+    all_blocked = []
+    moments = []
+    for moment in range(et-300, et+301, 60):
+        total_blocked, srf_points = blocked_moment(resolution, observer, blockers, moment)
+        all_blocked.append(total_blocked)
+        moments.append(moment)
+    
+
+    print("Process finished --- %s seconds ---" % (time.time() - start_time))
+    #visualize_blocked_fractions(total_blocked, srf_points, observer, blockers)
+    visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blockers, moments)
+
+
+
+def blocked_moment(resolution, observer, blockers, moment):
     # Create array of actual surface points on observer body facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame. This is needed for the next step to calculate the disk properties of the sun and blockers as seen from these points, which is needed to calculate the blocked fractions.
-    srf_points = create_pos_array(resolution, observer, et)
+    srf_points = create_pos_array(resolution, observer, moment)
     
     # Get the disk properties of the sun and blockers as seen from the surface points.
-    sun_disk_props = get_disk_properties_cartesian(observer, "Sun", et, srf_points)
+    sun_disk_props = get_disk_properties_cartesian(observer, "Sun", moment, srf_points)
 
     total_blocked = np.zeros(len(srf_points))
     # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
     for blocker in blockers:
         print(f"Calculating blocked fractions for {blocker}...")
-        blocker_disk_props = get_disk_properties_cartesian(observer, blocker, et, srf_points)
+        blocker_disk_props = get_disk_properties_cartesian(observer, blocker, moment, srf_points)
         blocked_fractions = get_blocked_fractions_cartesian(sun_disk_props, blocker_disk_props)
         total_blocked = np.clip(total_blocked + blocked_fractions, 0.0, 1.0)
+    
+    return total_blocked, srf_points
 
-    print("Process finished --- %s seconds ---" % (time.time() - start_time))
-    visualize_blocked_fractions(total_blocked, srf_points, observer, blockers)
 
 
 def furnish_kernels():
@@ -107,7 +126,7 @@ def create_pos_array(resolution, body, et):
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
 
     # Longitudes: only the longitudes of the half of the planetoid facing the sun
-    longitudes = np.linspace(subsolar_lon-4*np.pi/8,subsolar_lon+4*np.pi/8,resolution,endpoint=True)
+    longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
 
     # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole. 
     # We also ignore south and north pole as if they are included they will be included resolution times, one for every longitude.
@@ -321,6 +340,65 @@ def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blocker
     ax.set_title(f'Sun Blocked Fraction on {observer} Surface\nBlockers: {", ".join(blockers)}')
     plt.show()
 
+# Slider function made by ChatGPT
+def visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blockers, moments):
+
+    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.95
+
+    x = np.array([p[0] for p in srf_points])
+    y = np.array([p[1] for p in srf_points])
+    z = np.array([p[2] for p in srf_points])
+
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.add_subplot(111, projection='3d')
+    plt.subplots_adjust(bottom=0.25)
+
+    ax.set_box_aspect([1,1,1])
+
+    # Initial frame
+    blocked = np.array(all_blocked[0])
+    colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
+
+    scatter = ax.scatter(x, y, z, c=colors, s=20)
+
+    # Transparent sphere
+    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
+    xs = observer_radius * np.cos(u) * np.sin(v)
+    ys = observer_radius * np.sin(u) * np.sin(v)
+    zs = observer_radius * np.cos(v)
+    ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
+
+    ax.set_xlabel('X (km)')
+    ax.set_ylabel('Y (km)')
+    ax.set_zlabel('Z (km)')
+
+    title = ax.set_title("")
+
+    # Slider
+    slider_ax = plt.axes([0.2,0.1,0.6,0.03])
+    slider = Slider(slider_ax, "Time step", 0, len(all_blocked)-1,
+                    valinit=0, valstep=1)
+
+    def update(val):
+
+        idx = int(slider.val)
+        blocked = np.array(all_blocked[idx])
+
+        colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
+
+        scatter.set_color(colors)
+
+        title.set_text(
+            f"Sun Blocked Fraction on {observer}\n"
+            f"Blockers: {', '.join(blockers)}\n"
+            f"ET: {moments[idx]}"
+        )
+
+        fig.canvas.draw_idle()
+
+    slider.on_changed(update)
+
+    plt.show()
 
 if __name__ == '__main__':
     main()
