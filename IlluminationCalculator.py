@@ -43,7 +43,7 @@ def main():
     '''
     all_blocked = []
     moments = []
-    for moment in range(et-300, et+301, 60):
+    for moment in range(et-300, et+301, 30):    # 5 minutes back and forth, every 30 s
         total_blocked, srf_points = blocked_moment(resolution, observer, blockers, moment)
         all_blocked.append(total_blocked)
         moments.append(moment)
