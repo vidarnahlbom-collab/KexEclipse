@@ -5,6 +5,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
 # Vidar Cardell Nahlbom, Andreas Jensen Herres
@@ -30,7 +31,7 @@ def main():
 
     start_time = time.time()
 
-    resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    resolution = 60 # Number of points in each direction for surface point array, so total number of points is resolution^2
     utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
     #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
@@ -41,9 +42,12 @@ def main():
     '''
     total_blocked, srf_points = blocked_moment(resolution, observer, blockers, et)
     '''
+    time_frame = 180    # the time in seconds that the animation includes, back and forth
+    time_step = 10      # the time in seconds that each step moves forward with
+
     all_blocked = []
     moments = []
-    for moment in range(et-300, et+301, 30):    # 5 minutes back and forth, every 30 s
+    for moment in range(et-time_frame, et+time_frame+1, time_step):
         total_blocked, srf_points = blocked_moment(resolution, observer, blockers, moment)
         all_blocked.append(total_blocked)
         moments.append(moment)
@@ -51,7 +55,8 @@ def main():
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
     #visualize_blocked_fractions(total_blocked, srf_points, observer, blockers)
-    visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blockers, moments)
+    #visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blockers, moments)
+    visualize_blocked_fractions_animation(all_blocked, srf_points, observer, blockers, moments)
 
 
 
@@ -85,6 +90,7 @@ def furnish_kernels():
     spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
 
 
+
 def select_bodies():
     '''
     Asks user to select wanted moons and blockers
@@ -107,6 +113,7 @@ def select_bodies():
         print("INVALID")
 
     return observer, blockers
+
 
 
 def create_pos_array(resolution, body, et):
@@ -145,6 +152,7 @@ def create_pos_array(resolution, body, et):
     return srf_points
 
 
+
 def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
     blocked_fractions = []
     
@@ -161,6 +169,7 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
     return blocked_fractions
 
 
+
 def get_disk_properties_cartesian(observer, body, et, srf_points):
     radii = spice.bodvrd(body, "RADII", 3)[1][0]
     local_normalized_cartesian_coords = []
@@ -173,6 +182,7 @@ def get_disk_properties_cartesian(observer, body, et, srf_points):
         local_normalized_cartesian_coords.append([body_local_xyz_pos[0]/body_dis, body_local_xyz_pos[1]/body_dis, body_local_xyz_pos[2]/body_dis, body_ang_radius])
 
     return local_normalized_cartesian_coords
+
 
 # VSC code heavily edited by Vidar
 def get_blocked_fractions_radial(body1_disk_props, body2_disk_props):
@@ -222,6 +232,7 @@ def get_blocked_fractions_radial(body1_disk_props, body2_disk_props):
         blocked_fractions.append(blocked)
     
     return blocked_fractions
+
 
 
 def get_disk_properties_radial(observer, body, et, srf_points):
@@ -277,6 +288,7 @@ def get_disk_properties_radial(observer, body, et, srf_points):
   
     return disk_props
 
+
 # GPT code commented and understood, but just math
 def disk_overlap_fraction(r1, r2, d):
     """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
@@ -299,6 +311,7 @@ def disk_overlap_fraction(r1, r2, d):
 
     overlap = part1 + part2 - part3
     return overlap / (np.pi * r1**2) # Finally, normalize by the area of body1 to get the blocked fraction
+
 
 # GPT code, due to change since slow and no time slider
 def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blockers):
@@ -339,6 +352,7 @@ def visualize_blocked_fractions(blocked_fractions, srf_points, observer, blocker
     ax.set_zlabel('Z (km)')
     ax.set_title(f'Sun Blocked Fraction on {observer} Surface\nBlockers: {", ".join(blockers)}')
     plt.show()
+
 
 # Slider function made by ChatGPT
 def visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blockers, moments):
@@ -399,6 +413,67 @@ def visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blocke
     slider.on_changed(update)
 
     plt.show()
+
+
+# animation function made by ChatGPT
+def visualize_blocked_fractions_animation(all_blocked, srf_points, observer, blockers, moments):
+
+    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.95
+
+    x = np.array([p[0] for p in srf_points])
+    y = np.array([p[1] for p in srf_points])
+    z = np.array([p[2] for p in srf_points])
+
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.set_box_aspect([1,1,1])
+
+    blocked = np.array(all_blocked[0])
+    colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
+
+    scatter = ax.scatter(x, y, z, c=colors, s=20)
+
+    # Transparent sphere
+    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
+    xs = observer_radius * np.cos(u) * np.sin(v)
+    ys = observer_radius * np.sin(u) * np.sin(v)
+    zs = observer_radius * np.cos(v)
+
+    ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
+
+    ax.set_xlabel('X (km)')
+    ax.set_ylabel('Y (km)')
+    ax.set_zlabel('Z (km)')
+
+    title = ax.set_title("")
+
+    def update(frame):
+
+        blocked = np.array(all_blocked[frame])
+        colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
+
+        scatter.set_color(colors)
+
+        title.set_text(
+            f"Sun Blocked Fraction on {observer}\n"
+            f"Blockers: {', '.join(blockers)}\n"
+            f"ET: {moments[frame]}"
+        )
+
+        return scatter,
+
+    ani = FuncAnimation(
+        fig,
+        update,
+        frames=len(all_blocked),
+        interval=100,   # milliseconds between frames
+        blit=False
+    )
+
+    plt.show()
+
+
 
 if __name__ == '__main__':
     main()
