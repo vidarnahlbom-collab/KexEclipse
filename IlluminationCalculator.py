@@ -381,8 +381,7 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
         return np.column_stack([1-blocked, 1-blocked, 1-blocked])
 
     def make_title(moment):
-        title = f"Sun Blocked Fraction on {observer}\nBlockers: {blocker_str}\nUTC: {spice.et2utc(moment, 'C', 3)}"
-        return title
+        return f"Sun Blocked Fraction on {observer}\nBlockers: {blocker_str}\nUTC: {spice.et2utc(moment, 'C', 3)}"
 
     match mode:
         case "Still":
@@ -390,8 +389,11 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
             ax.set_title(make_title(moments[0]))
         
         case "Slider":
+            # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
             title = ax.set_title(make_title(moments[0]))
+
+            # Slider
             plt.subplots_adjust(bottom=0.25)
             slider_ax = plt.axes([0.2, 0.1, 0.6, 0.03])
             slider = Slider(slider_ax, "Time step", 0, len(blocked_data)-1, valinit=0, valstep=1)
@@ -403,18 +405,25 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
                 fig.canvas.draw_idle()
 
             slider.on_changed(update_slider)
-        
 
         case "Animation":
+            # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
             title = ax.set_title(make_title(moments[0]))
         
+            # Animation
             def update_animation(frame):
                 scatter.set_color(make_colors(blocked_data[frame]))
                 title.set_text(make_title(moments[frame]))
                 return scatter,
 
-            ani = FuncAnimation(fig, update_animation, frames=len(blocked_data), interval=100, blit=False)
+            ani = FuncAnimation(
+                fig, 
+                update_animation, 
+                frames=len(blocked_data), 
+                interval=100, # Milliseonds between frames
+                blit=False
+            )
         
     set_axes_equal(ax)
     plt.show()
