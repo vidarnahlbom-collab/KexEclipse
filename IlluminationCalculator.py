@@ -12,12 +12,30 @@ from mpl_toolkits.mplot3d import Axes3D
 # 2026-03-05
 # KEX L5
 
-"""
-Moon does not block itself
-Add time slider
-Make plot more smooth when moving
+""" 
+Take into account planetoid rotation during animation. 
 
-model moon exosphere via a plane facing the sun, with lower resolution to show shadow moving and also in large scale around the moon
+Add specific observer angles/perspectives 
+
+So as seen from earth, at snap shot times, like JPL horizon systems 
+
+Compare the ang sep output of JPL to how we see the shadows at the same time (adjusted for LT) and same observer location, use earth for easy positions. 
+
+Use illumf function to get angles (points for entire moon) 
+
+Added numerical output per point in graf and in data terminal 
+
+Graph plot of illumination at specific location over time (interpolated function). 
+
+Change visualization tool, to get it smoother 
+
+Consider meshgrid to limit see through 
+
+Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
+
+Add texture map to planetoids.  
+
+Make sure all axises are the same length in visualization.  
 """
 
 def main():
@@ -26,15 +44,15 @@ def main():
     '''
     furnish_kernels()
 
-    #observer, blockers = select_bodies()
-    observer, blockers = "Europa", ["Jupiter"]
+    observer, blockers = select_bodies()
+    #observer, blockers = "Europa", ["Jupiter"]
 
     start_time = time.time()
 
-    resolution = 60 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
+    resolution = 20 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    #utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
-    #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
+    utc = "2015 Jan 24 06:09:19" # Triple shadow transit
     #utc = "2015 Jan 24 05:16:22" # 2 shadow transits in the same spot on jupiter with io and callisto
     et = int(spice.utc2et(utc))
     print(utc)
@@ -42,8 +60,8 @@ def main():
     '''
     total_blocked, srf_points = blocked_moment(resolution, observer, blockers, et)
     '''
-    time_frame = 180    # the time in seconds that the animation includes, back and forth
-    time_step = 10      # the time in seconds that each step moves forward with
+    time_frame = 1800    # the time in seconds that the animation includes, back and forth
+    time_step = 100      # the time in seconds that each step moves forward with
 
     all_blocked = []
     moments = []
@@ -133,11 +151,16 @@ def create_pos_array(resolution, body, et):
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
 
     # Longitudes: only the longitudes of the half of the planetoid facing the sun
-    longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
-
     # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole. 
     # We also ignore south and north pole as if they are included they will be included resolution times, one for every longitude.
-    latitudes = np.linspace(-np.pi/2, np.pi/2, resolution,endpoint=False)[1:]
+    # Additonally, if the the body is Jupiter, we only calculate a small band around the equator where transit shadows can occur
+    # And we redistribute the surface points. 
+    if body == "Jupiter":
+        latitudes = np.linspace(-np.pi/20, np.pi/20, int(float(resolution)/3),endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution*3,endpoint=True)
+    else:
+        latitudes = np.linspace(-np.pi/2, np.pi/2, resolution,endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
