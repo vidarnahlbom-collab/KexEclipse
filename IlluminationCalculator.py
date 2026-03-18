@@ -59,7 +59,8 @@ def main():
     time_frame = 180    # The time in seconds that the animation includes, back and forth
     time_step = 10      # The time in seconds that each step moves forward with
     mode = "Animation"
-    illumination = True
+    illumination = True     # Chooses if the illumination function is used; better lighting but slower
+    half_moon = True        # Chooses if only half the moon should be shown
 
     start_time = time.time()
 
@@ -82,7 +83,7 @@ def main():
 
         # The other option is to, for every single moment, get new srf points and do calculations with those.
         # For that, we would have to change the position of the points in the visualization for every moment. 
-        srf_points = create_pos_array(resolution, observer, et, illumination) 
+        srf_points = create_pos_array(resolution, observer, et, half_moon) 
         for i, moment in enumerate(range(et-time_frame, et+time_frame+1, time_step)):
             #blocked_at_moment, srf_point = blocked_moment(resolution, observer, blockers, moment, iter=i+1, illum=illumination)
             blocked_at_moment = blocked_moment(resolution, observer, blockers, srf_points, moment, iter=i+1, illum=illumination)
@@ -195,7 +196,7 @@ def get_illum(observer, moment, srf_points):
 
 
 
-def create_pos_array(resolution, body, et, illum):
+def create_pos_array(resolution, body, et, half_moon):
     """
     Returns an array of surface points facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame.
 
@@ -207,9 +208,7 @@ def create_pos_array(resolution, body, et, illum):
     Returns:
         np.ndarray: Array of surface points in km, shape (resolution^2, 3)
     """
-    i = 2
-    if illum:
-        i = 1
+    portion = 1 + half_moon
 
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
@@ -224,7 +223,7 @@ def create_pos_array(resolution, body, et, illum):
         longitudes = np.linspace(subsolar_lon-np.pi/2, subsolar_lon+np.pi/2, resolution*3, endpoint=True)
     else:
         latitudes = np.linspace(-np.pi/2, np.pi/2, resolution, endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/i, subsolar_lon+np.pi/i, resolution, endpoint=True)
+        longitudes = np.linspace(subsolar_lon-np.pi/portion, subsolar_lon+np.pi/portion, resolution, endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
