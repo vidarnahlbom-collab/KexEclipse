@@ -41,25 +41,26 @@ def main():
     '''
     furnish_kernels()
 
-    #observer, blockers, mode = select_parameters()
+    #observer, blockers = select_bodies()
+    
+    utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+    observer, blockers = "Europa", ['Jupiter']
+    
+    #utc = "2026 Mar 07 06:16:33"   # Jupiter eclipsed by Io
+    #observer, blockers = "Jupiter", ['Io']
+    
+    #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
+    #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
+    
+    #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
+    #observer, blockers = "Jupiter", ['Io', 'Callisto']
+
+    resolution = 50     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    time_frame = 180    # The time in seconds that the animation includes, back and forth
+    time_step = 10      # The time in seconds that each step moves forward with
+    mode = "Animation"
 
     start_time = time.time()
-
-    resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    time_frame = 180    # the time in seconds that the animation includes, back and forth
-    time_step = 10  # the time in seconds that each step moves forward with
-    
-    utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
-    observer, blockers, mode = "Europa", ['Jupiter'], "Animation"
-    
-    #utc = "2026 Mar 07 06:16:33" # Jupiter eclipsed by Io
-    #observer, blockers, mode = "Jupiter", ['Io'], "Animation"
-    
-    #utc = "2015 Jan 24 06:09:19" # Triple shadow transit
-    #observer, blockers, mode = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'], "Animation"
-    
-    #utc = "2015 Jan 24 05:16:22" # 2 shadow transits in the same spot on jupiter with io and callisto
-    #observer, blockers, mode = "Jupiter", ['Io', 'Callisto'], "Animation"
 
     et = int(spice.utc2et(utc))
     print(utc)
@@ -106,33 +107,51 @@ def furnish_kernels():
 
 
 
-def select_parameters():
+def select_bodies():
     '''
-    Asks user to select wanted moons and blockers
+    Asks user to select observer and obstructing bodies
     '''
     bodies = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
-    print("Available bodies: " + ", ".join(bodies))
+
     while True:
-        observer = input("Select observer: ").capitalize().strip()
+        print("")
+        print("Available bodies: " + ", ".join(bodies))
+        observer = input("Select observer: ").strip().capitalize()
         if observer in bodies:
             break
         print("INVALID")
+
     while True:
+        print("")
+        print("Available bodies: " + ", ".join(bodies))
         blockers = input("Select obstructing bodies (separated by commas, enter for all): ").split(",")
         if blockers == [""]:
-            blockers = [b for b in bodies if b != observer] # If user presses enter, all other bodies are blockers
+            blockers = [body for body in bodies if body != observer]    # If user presses enter, all other bodies are blockers
             break
-        blockers = [b.strip().capitalize() for b in blockers] # Remove extra whitespace and capital letters
+        blockers = [body.strip().capitalize() for body in blockers]     # Remove extra whitespace and capital letters
         if all(blocker in bodies and blocker != observer for blocker in blockers):
             break
         print("INVALID")
+    
+    return observer, blockers
+
+
+
+def select_mode():
+    '''
+    Asks the user how they wish to display the result
+    '''
+    modes = ["Still", "Slider", "Animation"]
+
     while True:
-        mode = input("Select mode (still, slider, animation): ").capitalize().strip()
-        if mode in ["Still", "Slider", "Animation"]:
+        print("")
+        print("Available mode: " + ", ".join(modes))
+        mode = input("Select mode: ").strip().capitalize()
+        if mode in modes:
             break
         print("INVALID")
 
-    return observer, blockers, mode
+    return mode
 
 
 
@@ -163,6 +182,7 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
     return blocked_at_moment#, srf_points
 
 
+
 def get_illum(observer, moment, srf_points):
     illum_data = []
     for srf_point in srf_points:
@@ -171,6 +191,7 @@ def get_illum(observer, moment, srf_points):
             )
         illum_data.append([lit, incdnc])
     return illum_data
+
 
 
 def create_pos_array(resolution, body, et):
@@ -295,6 +316,9 @@ def get_blocked_fractions_radial(body1_disk_props, body2_disk_props):
         blocked_fractions.append(blocked)
     
     return blocked_fractions
+
+
+
 def get_disk_properties_radial(observer, body, et, srf_points):
     """
     Returns the azimuth, elevation and angular size of the body as seen from the surface points.
@@ -371,6 +395,7 @@ def disk_overlap_fraction(r1, r2, d):
 
     overlap = part1 + part2 - part3
     return overlap / (np.pi * r1**2) # Finally, normalize by the area of body1 to get the blocked fraction
+
 
 
 def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
@@ -553,7 +578,7 @@ def visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blocke
     plt.show()
 
 
-# animation function made by ChatGPT, REDUNDANT
+# Animation function made by ChatGPT, REDUNDANT
 def visualize_blocked_fractions_animation(all_blocked, srf_points, observer, blockers, moments):
 
     observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.95
