@@ -145,11 +145,7 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
 
     blocked_at_moment = np.zeros(len(srf_points))
     
-    sunlit_flags = get_illum(observer, moment, srf_points)
-
-    for i in range(len(srf_points)):
-        if not sunlit_flags[i]:
-            blocked_at_moment[i] = 1.0
+    illum_data = get_illum(observer, moment, srf_points)
 
     # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
     for blocker in blockers:
@@ -158,17 +154,23 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
         blocked = get_blocked_fractions_cartesian(sun_disk_props, blocker_disk_props)
         blocked_at_moment = np.clip(blocked_at_moment + blocked, 0.0, 1.0)
     
+    for i in range(len(srf_points)):
+        if not illum_data[i][0]:
+            blocked_at_moment[i] = 1.0
+        else:
+            blocked_at_moment[i] = 1 - math.cos(illum_data[i][1]) * (1 - blocked_at_moment[i])
+
     return blocked_at_moment#, srf_points
 
 
 def get_illum(observer, moment, srf_points):
-    is_lit = []
+    illum_data = []
     for srf_point in srf_points:
         trgepc, srfvec, phase, incdnc, emissn, visibl, lit = spice.illumf(
             "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "LT+S", "Sun", srf_point
             )
-        is_lit.append(lit)
-    return is_lit
+        illum_data.append([lit, incdnc])
+    return illum_data
 
 
 def create_pos_array(resolution, body, et):
@@ -197,7 +199,7 @@ def create_pos_array(resolution, body, et):
         longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution*3,endpoint=True)
     else:
         latitudes = np.linspace(-np.pi/2, np.pi/2, resolution,endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi*2/2,subsolar_lon+np.pi*2/2,resolution,endpoint=True)
+        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
