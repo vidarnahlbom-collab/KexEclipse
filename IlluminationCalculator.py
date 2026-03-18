@@ -46,8 +46,8 @@ def main():
     start_time = time.time()
 
     resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    time_frame = 100000    # the time in seconds that the animation includes, back and forth
-    time_step = 10000  # the time in seconds that each step moves forward with
+    time_frame = 180    # the time in seconds that the animation includes, back and forth
+    time_step = 10  # the time in seconds that each step moves forward with
     
     utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     observer, blockers, mode = "Europa", ['Jupiter'], "Animation"
@@ -193,11 +193,11 @@ def create_pos_array(resolution, body, et):
     # Additonally, if the the body is Jupiter, we only calculate a small band around the equator where transit shadows can occur
     # And we redistribute the surface points. 
     if body == "Jupiter":
-        latitudes = np.linspace(-np.pi/20, np.pi/20, int(float(resolution)/3),endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution*3,endpoint=True)
+        latitudes = np.linspace(-np.pi/20, np.pi/20, int(float(resolution)/3), endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon-np.pi/2, subsolar_lon+np.pi/2, resolution*3, endpoint=True)
     else:
-        latitudes = np.linspace(-np.pi/2, np.pi/2, resolution,endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi*2/2,subsolar_lon+np.pi*2/2,resolution,endpoint=True)
+        latitudes = np.linspace(-np.pi/2, np.pi/2, resolution, endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon-np.pi, subsolar_lon+np.pi, resolution, endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
