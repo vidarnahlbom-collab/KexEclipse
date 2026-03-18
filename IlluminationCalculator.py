@@ -184,6 +184,9 @@ def create_pos_array(resolution, body, et):
         np.ndarray: Array of surface points in km, shape (resolution^2, 3)
     """
     
+    # Flag for if whole body should be modeled
+    all = 1
+
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
 
@@ -193,11 +196,11 @@ def create_pos_array(resolution, body, et):
     # Additonally, if the the body is Jupiter, we only calculate a small band around the equator where transit shadows can occur
     # And we redistribute the surface points. 
     if body == "Jupiter":
-        latitudes = np.linspace(-np.pi/20, np.pi/20, int(float(resolution)/3),endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution*3,endpoint=True)
+        latitudes = np.linspace(-np.pi*(all*10)/20, np.pi*(all*10)/20, int(float(resolution)/3),endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon-np.pi*(all*2)/2,subsolar_lon+np.pi*(all*2)/2,resolution*3,endpoint=True)
     else:
-        latitudes = np.linspace(-np.pi/2, np.pi/2, resolution,endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
+        latitudes = np.linspace(-np.pi*(all*2)/2, np.pi*(all*2)/2, resolution,endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon-np.pi*(all*2)/2,subsolar_lon+np.pi*(all*2)/2,resolution,endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
