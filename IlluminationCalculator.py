@@ -55,10 +55,11 @@ def main():
     #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #observer, blockers = "Jupiter", ['Io', 'Callisto']
 
-    resolution = 50     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    resolution = 60     # Number of points in each direction for surface point array, so total number of points is resolution^2
     time_frame = 180    # The time in seconds that the animation includes, back and forth
     time_step = 10      # The time in seconds that each step moves forward with
     mode = "Animation"
+    illumination = True
 
     start_time = time.time()
 
@@ -71,7 +72,7 @@ def main():
     moments = []
     
     if mode == "Still":
-        blocked_total, srf_points = blocked_moment(resolution, observer, blockers, et, iter=1)
+        blocked_total, srf_points = blocked_moment(resolution, observer, blockers, et, iter=1, illum=illumination)
         moments.append(et)
     else:
         # We only take one single set of surface points, so given a long enough time frame, these should eventually rotate out of sunlight
@@ -81,10 +82,10 @@ def main():
 
         # The other option is to, for every single moment, get new srf points and do calculations with those.
         # For that, we would have to change the position of the points in the visualization for every moment. 
-        srf_points = create_pos_array(resolution, observer, et) 
+        srf_points = create_pos_array(resolution, observer, et, illumination) 
         for i, moment in enumerate(range(et-time_frame, et+time_frame+1, time_step)):
-            #blocked_at_moment, srf_point = blocked_moment(resolution, observer, blockers, moment, iter=i+1)
-            blocked_at_moment = blocked_moment(resolution, observer, blockers, srf_points, moment, iter=i+1)
+            #blocked_at_moment, srf_point = blocked_moment(resolution, observer, blockers, moment, iter=i+1, illum=illumination)
+            blocked_at_moment = blocked_moment(resolution, observer, blockers, srf_points, moment, iter=i+1, illum=illumination)
             #srf_points = np.vstack([srf_points, srf_point]) if srf_points.size else srf_point
             blocked_total = np.vstack([blocked_total, blocked_at_moment]) if blocked_total.size else blocked_at_moment
             moments.append(moment)
@@ -155,7 +156,7 @@ def select_mode():
 
 
 
-def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
+def blocked_moment(resolution, observer, blockers, srf_points, moment, iter, illum):
     # Create array of actual surface points on observer body facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame. This is needed for the next step to calculate the disk properties of the sun and blockers as seen from these points, which is needed to calculate the blocked fractions.
     #srf_points = create_pos_array(resolution, observer, moment)
     
@@ -163,8 +164,6 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
     sun_disk_props = get_disk_properties_cartesian(observer, "Sun", moment, srf_points)
 
     blocked_at_moment = np.zeros(len(srf_points))
-    
-    illum_data = get_illum(observer, moment, srf_points)
 
     # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
     for blocker in blockers:
@@ -173,11 +172,13 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
         blocked = get_blocked_fractions_cartesian(sun_disk_props, blocker_disk_props)
         blocked_at_moment = np.clip(blocked_at_moment + blocked, 0.0, 1.0)
     
-    for i in range(len(srf_points)):
-        if not illum_data[i][0]:
-            blocked_at_moment[i] = 1.0
-        else:
-            blocked_at_moment[i] = 1 - math.cos(illum_data[i][1]) * (1 - blocked_at_moment[i])
+    if illum:
+        illum_data = get_illum(observer, moment, srf_points)
+        for i in range(len(srf_points)):
+            if not illum_data[i][0]:
+                blocked_at_moment[i] = 1.0
+            else:
+                blocked_at_moment[i] = 1 - math.cos(illum_data[i][1]) * (1 - blocked_at_moment[i])
 
     return blocked_at_moment#, srf_points
 
@@ -194,7 +195,7 @@ def get_illum(observer, moment, srf_points):
 
 
 
-def create_pos_array(resolution, body, et):
+def create_pos_array(resolution, body, et, illum):
     """
     Returns an array of surface points facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame.
 
@@ -206,6 +207,9 @@ def create_pos_array(resolution, body, et):
     Returns:
         np.ndarray: Array of surface points in km, shape (resolution^2, 3)
     """
+    i = 2
+    if illum:
+        i = 1
 
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
@@ -220,7 +224,7 @@ def create_pos_array(resolution, body, et):
         longitudes = np.linspace(subsolar_lon-np.pi/2, subsolar_lon+np.pi/2, resolution*3, endpoint=True)
     else:
         latitudes = np.linspace(-np.pi/2, np.pi/2, resolution, endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi, subsolar_lon+np.pi, resolution, endpoint=True)
+        longitudes = np.linspace(subsolar_lon-np.pi/i, subsolar_lon+np.pi/i, resolution, endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
