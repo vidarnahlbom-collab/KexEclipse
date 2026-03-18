@@ -45,9 +45,9 @@ def main():
 
     start_time = time.time()
 
-    resolution = 20 # Number of points in each direction for surface point array, so total number of points is resolution^2
-    time_frame = 10000    # the time in seconds that the animation includes, back and forth
-    time_step = 500  # the time in seconds that each step moves forward with
+    resolution = 50 # Number of points in each direction for surface point array, so total number of points is resolution^2
+    time_frame = 100000    # the time in seconds that the animation includes, back and forth
+    time_step = 10000  # the time in seconds that each step moves forward with
     
     utc = "2021 Apr 25 15:26:31" # Europa eclipsed by Jupiter
     observer, blockers, mode = "Europa", ['Jupiter'], "Animation"
@@ -145,11 +145,11 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
 
     blocked_at_moment = np.zeros(len(srf_points))
     
-    # sunlit_flags = get_illum(observer, moment, srf_points)
+    sunlit_flags = get_illum(observer, moment, srf_points)
 
-    # for i in range(len(srf_points)):
-    #     if not sunlit_flags[i]:
-    #         blocked_at_moment[i] = 1.0
+    for i in range(len(srf_points)):
+        if not sunlit_flags[i]:
+            blocked_at_moment[i] = 1.0
 
     # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
     for blocker in blockers:
@@ -161,14 +161,14 @@ def blocked_moment(resolution, observer, blockers, srf_points, moment, iter):
     return blocked_at_moment#, srf_points
 
 
-# def get_illum(observer, moment, srf_points):
-#     is_lit = []
-#     for srf_point in srf_points:
-#         trgepc, srfvec, phase, incdnc, emissn, visibl, lit = spice.illumf(
-#             "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "LT+S", observer, srf_point
-#             )
-#         is_lit.append(lit)
-#     return is_lit
+def get_illum(observer, moment, srf_points):
+    is_lit = []
+    for srf_point in srf_points:
+        trgepc, srfvec, phase, incdnc, emissn, visibl, lit = spice.illumf(
+            "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "LT+S", "Sun", srf_point
+            )
+        is_lit.append(lit)
+    return is_lit
 
 
 def create_pos_array(resolution, body, et):
@@ -197,7 +197,7 @@ def create_pos_array(resolution, body, et):
         longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution*3,endpoint=True)
     else:
         latitudes = np.linspace(-np.pi/2, np.pi/2, resolution,endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/2,subsolar_lon+np.pi/2,resolution,endpoint=True)
+        longitudes = np.linspace(subsolar_lon-np.pi*2/2,subsolar_lon+np.pi*2/2,resolution,endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
