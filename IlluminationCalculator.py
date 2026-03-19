@@ -43,24 +43,24 @@ def main():
 
     #observer, blockers = select_bodies()
     
-    utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-    observer, blockers = "Europa", ['Jupiter']
+    #utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+    #observer, blockers = "Europa", ['Jupiter']
     
     #utc = "2026 Mar 07 06:16:33"   # Jupiter eclipsed by Io
     #observer, blockers = "Jupiter", ['Io']
     
-    #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
-    #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
+    utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
+    observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
     
     #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #observer, blockers = "Jupiter", ['Io', 'Callisto']
 
-    resolution = 60     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    resolution = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
     time_frame = 180    # The time in seconds that the animation includes, back and forth
     time_step = 10      # The time in seconds that each step moves forward with
     mode = "Animation"
     illumination = True     # Chooses if the illumination function is used; better lighting but slower
-    half_moon = True        # Chooses if only half the moon should be shown
+    half_moon = False       # Chooses if only half the moon should be shown
 
     start_time = time.time()
 
@@ -79,14 +79,14 @@ def main():
     # The other option is to, for every single moment, get new srf points and do calculations with those.
     # For that, we would have to change the position of the points in the visualization for every moment. 
     # This would be computationally expensive, and we lose the ability to track a singular coordinate on the surface.
-    srf_points = create_pos_array(resolution, observer, et) 
+    srf_points = create_pos_array(resolution, observer, et, half_moon) 
     
     if mode == "Still":
-        blocked_total = blocked_moment(observer, blockers, srf_points, et, iter=1)
+        blocked_total = blocked_moment(observer, blockers, srf_points, et, 1, illumination)
         moments.append(et)
     else:
         for i, moment in enumerate(range(et-time_frame, et+time_frame+1, time_step)):
-            blocked_at_moment = blocked_moment(observer, blockers, srf_points, moment, iter=i+1)
+            blocked_at_moment = blocked_moment(observer, blockers, srf_points, moment, i+1, illumination)
             blocked_total = np.vstack([blocked_total, blocked_at_moment]) if blocked_total.size else blocked_at_moment
             moments.append(moment)
 
@@ -156,7 +156,35 @@ def select_mode():
 
 
 
-def blocked_moment(observer, blockers, srf_points, moment, iter):
+def get_illum(observer, moment, srf_points):
+    """
+    Returns the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
+    
+    Args:
+        observer (str): Name of the body surface points are on (e.g. "Europa")
+        moment (int): Ephemeris time for which to calculate illumination data
+        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
+
+    Returns:
+        np.ndarray: Array of flags for if point is illuminated or not
+        np.ndarray: Array of incidence angles in radians 
+    """
+
+    lit_flags = []
+    incidence_angles = []
+    for srf_point in srf_points:
+        # Currently most of output is not used, observer is technically sun, but in out code observer is moon.
+        #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
+        _, _, _, incdnc, _, _, lit = spice.illumf(
+            "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "LT+S", "Sun", srf_point
+        )
+        lit_flags.append(lit)
+        incidence_angles.append(incdnc)
+    return np.array(lit_flags), np.array(incidence_angles)
+
+
+
+def blocked_moment(observer, blockers, srf_points, moment, iter, illum):
     """
     Calculated % of sunlight hitting the surface at each surface point at a given moment.
     Takes into account eclipses and sun illumination angle. 
@@ -169,54 +197,43 @@ def blocked_moment(observer, blockers, srf_points, moment, iter):
 
     Returns:
         np.ndarray: Array of blocked fractions (0 to 1) for each surface point
-
     """
+    blocked_at_moment = np.ones(len(srf_points)) # Default is dark/unlit 
 
+    if illum:
+        lit_flags, incidence_angles = get_illum(observer, moment, srf_points)
+        lit_mask = lit_flags.astype(bool) # True where sunlit
+    else:
+        lit_mask = np.ones(len(srf_points), dtype=bool) # treat all as lit
+
+    lit_points = srf_points[lit_mask] # lit_points now only containts points that are lit
+
+    if len(lit_points) == 0:
+        return blocked_at_moment  # everything dark, skip all SPICE work
+
+    # We only get disk properties for the lit points
     # Get the disk properties of the sun and blockers as seen from the surface points.
-    sun_disk_props = get_disk_properties_cartesian(observer, "Sun", moment, srf_points)
+    sun_disk_props = get_disk_properties_cartesian(observer, "Sun", moment, lit_points)
 
-    blocked_at_moment = np.zeros(len(srf_points))
-
-    # For every blocker, calculate the blocked fractions of the sun for every srf point and then combine them 
+    blocked_lit = np.zeros(len(lit_points))
+    # For every blocker, calculate the blocked fractions of the sun for every lit point and then combine them 
     for blocker in blockers:
         print(f"Calculating blocked fractions {iter} for {blocker}...")
-        blocker_disk_props = get_disk_properties_cartesian(observer, blocker, moment, srf_points)
+        blocker_disk_props = get_disk_properties_cartesian(observer, blocker, moment, lit_points)
         blocked = get_blocked_fractions_cartesian(sun_disk_props, blocker_disk_props)
-        blocked_at_moment = np.clip(blocked_at_moment + blocked, 0.0, 1.0)
-        
+        blocked_lit = np.clip(blocked_lit + blocked, 0.0, 1.0)
+
     if illum:
-        illum_data = get_illum(observer, moment, srf_points)
-        for i in range(len(srf_points)):
-            if not illum_data[i][0]: # Checks flag for if point is illuminated by sun at all.
-                blocked_at_moment[i] = 1.0
-            else:
-                # Otherwise adjust illumination by cosine of the incidence angle.
-                blocked_at_moment[i] = 1 - math.cos(illum_data[i][1]) * (1 - blocked_at_moment[i])
+        # Apply cosine shading only to lit points
+        cos_angles = np.cos(incidence_angles[lit_mask])
+        blocked_lit = 1 - cos_angles * (1 - blocked_lit)
+
+    # blocked at moment starts unlit, but for every point where lit_mask is true (so point is lit)
+    # we change the value to the calculated illumination.
+    blocked_at_moment[lit_mask] = blocked_lit 
 
     return blocked_at_moment
 
-
-def get_illum(observer, moment, srf_points):
-    """
-    Returns the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
-    
-    Args:
-        observer (str): Name of the body surface points are on (e.g. "Europa")
-        moment (int): Ephemeris time for which to calculate illumination data
-        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
-
-    Returns:
-        list of list: List of [illuminated (bool), incidence angle (float in radians)] for each surface point
-    """
-    
-    illum_data = []
-    for srf_point in srf_points:
-        # Currently most of output is not used, observer is technically sun, but in out code observer is moon.
-        trgepc, srfvec, phase, incdnc, emissn, visibl, lit = spice.illumf(
-            "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "LT+S", "Sun", srf_point
-            )
-        illum_data.append([lit, incdnc])
-    return illum_data
 
 
 
@@ -263,43 +280,59 @@ def create_pos_array(resolution, body, et, half_moon):
 
 
 
-def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
-    blocked_fractions = []
-    
-    for body1_props, body2_props in zip(body1_disk_props, body2_disk_props):
-        body1_x, body1_y, body1_z, body1_ang_rad = body1_props
-        body2_x, body2_y, body2_z, body2_ang_rad = body2_props
-
-        dot_product = body1_x * body2_x + body1_y * body2_y + body1_z * body2_z
-        ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
-
-        blocked = disk_overlap_fraction(body1_ang_rad, body2_ang_rad, ang_sep)
-
-        blocked_fractions.append(blocked)
-    
-    return blocked_fractions
-
-
-
 def get_disk_properties_cartesian(observer, body, et, srf_points):
     radii = spice.bodvrd(body, "RADII", 3)[1][0]
     
-    #lcl_norm_xyz = []
-
+    relative_positions = []
     for point in srf_points:
-        body_local_xyz_pos = spice.spkcpo(body, et, "IAU_"+observer, "OBSERVER", "LT+S", point, observer, "IAU_"+observer)[0]
+        rel_pos = spice.spkcpo(body, et, "IAU_"+observer, "OBSERVER", "LT+S", point, observer, "IAU_"+observer)[0][:3]
+        relative_positions.append(rel_pos)
         #body_dis = math.sqrt(body_local_xyz_pos[0]**2 + body_local_xyz_pos[1]**2 + body_local_xyz_pos[2]**2)
         #body_ang_radius = math.atan(radii/body_dis) # In radians
         #lcl_norm_xyz.append([body_local_xyz_pos[0]/body_dis, body_local_xyz_pos[1]/body_dis, body_local_xyz_pos[2]/body_dis, body_ang_radius])
 
-    body_dis = np.linagl.norm(body_local_xyz_pos)
-    body_ang_radius = np.atan(radii/body_dis) # answer in radians
-    lcl_norm_xyz = [body_local_xyz_pos/body_dis, body_ang_radius]
+    # Convert to np.arrays for optimization
+    relative_positions = np.array(relative_positions)               # Shape (N,3)
+    distances = np.linalg.norm(relative_positions, axis=1)          # Shape (N, )
+    norm_rel_pos = relative_positions / distances[:, np.newaxis]    # Shape (N,3)
+    ang_radii = np.arctan(radii / distances) # answer in radians      Shape (N, )
                     
-    return lcl_norm_xyz
+    return np.column_stack([norm_rel_pos, ang_radii])               # Shape (N,4)
 
 
-# GPT code commented and understood, but just math
+
+def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
+    props1 = np.array(body1_disk_props)
+    props2 = np.array(body2_disk_props)
+
+    dot = np.sum(props1[:, :3] * props2[:, :3], axis=1)
+    
+    ang_sep = np.arccos(np.clip(dot, -1.0, 1.0))
+    r1 = props1[:, 3]
+    r2 = props2[:, 3]
+
+    # Check if any overlap is possible
+    no_overlap = (ang_sep >= r1 + r2)
+
+    # Check if fully blocked
+    full_block = (ang_sep <= np.abs(r1 - r2)) & (r2 >= r1)
+
+    # Check if partially blockeang_sep
+    partial_block_r2 = (ang_sep <= np.abs(r1 - r2)) & (r2 < r1)
+
+    part1 = r1**2 * np.arccos(np.clip((ang_sep**2 + r1**2 - r2**2) / (2*ang_sep*r1), -1.0, 1.0))
+    part2 = r2**2 * np.arccos(np.clip((ang_sep**2 + r2**2 - r1**2) / (2*ang_sep*r2), -1.0, 1.0))
+    part3 = 0.5 * np.sqrt(np.clip((-ang_sep+r1+r2)*(ang_sep+r1-r2)*(ang_sep-r1+r2)*(ang_sep+r1+r2), 0.0, None))
+
+    partial_overlap = (part1 + part2 - part3) / (np.pi * r1**2)
+
+    return np.where(no_overlap, 0.0,
+           np.where(full_block, 1.0,
+           np.where(partial_block_r2, (r2**2) / (r1**2),
+           partial_overlap)))
+
+
+# GPT code commented and understood, but just math, REDUNDANT, MOVED TO get_blocked_fractions_cartesian
 def disk_overlap_fraction(r1, r2, d):
     """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
 
