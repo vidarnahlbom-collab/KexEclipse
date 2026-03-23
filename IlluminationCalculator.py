@@ -105,7 +105,7 @@ def main():
         lonlat = [lon_rad, lat_rad]
         srf_points = np.array(spice.latsrf("ellipsoid", observer, et, "IAU_" + observer, [lonlat]))
     else:
-        srf_points, lonlat = create_pos_array(resolution, observer, et, half_moon) 
+        srf_points, lonlat, lon_grid, lat_grid  = create_pos_array(resolution, observer, et, half_moon) 
     
     if (mode == "Still" and not point):
         blocked_total = blocked_moment(observer, blockers, srf_points, et, 1, calculate_illumination)
@@ -125,7 +125,7 @@ def main():
     elif presentation == "Dots":
         visualize_3D_dots(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant)
     elif presentation == "Surface":
-        visualize_3D_surface(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant, et)
+        visualize_3D_surface(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant, lon_grid, lat_grid)
 
     
 
@@ -312,7 +312,7 @@ def create_pos_array(resolution, body, et, half_moon):
         latitudes = np.linspace(lat_offset-np.pi/(20*lat_portion), lat_offset+np.pi/(20*lat_portion), int(float(resolution)/adjust), endpoint=False)[1:]
         longitudes = np.linspace(subsolar_lon+lon_offset-np.pi/lon_portion, subsolar_lon+lon_offset+np.pi/lon_portion, resolution*adjust, endpoint=True)
     else:
-        latitudes = np.linspace(lat_offset-np.pi/2, lat_offset+np.pi/2, resolution, endpoint=False)[1:]
+        latitudes = np.linspace(lat_offset-np.pi/(2*lat_portion), lat_offset+np.pi/(2*lat_portion), resolution, endpoint=False)[1:]
         longitudes = np.linspace(subsolar_lon+lon_offset-np.pi/lon_portion, subsolar_lon+lon_offset+np.pi/lon_portion, resolution, endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
@@ -325,7 +325,7 @@ def create_pos_array(resolution, body, et, half_moon):
 
     srf_points = np.array(spice.latsrf("ellipsoid", body, et, "IAU_" + body, lonlat))
 
-    return srf_points, lonlat
+    return srf_points, lonlat, lon_grid, lat_grid
 
 
 
@@ -407,9 +407,8 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
 
 
 # All AI basically
-def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant, et):
-    from scipy.spatial import cKDTree
-
+def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant, lon_grid, lat_grid):
+    
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
@@ -417,39 +416,13 @@ def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, 
     # Get body radius (mean of actual point distances)
     r = np.mean(np.sqrt(x**2 + y**2 + z**2))
 
-    # Mirror the lat/lon bounds from surface point generation
-    # Build sphere grid
-    res = 200  # increase for smoother surface
-    subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", observer, et, "IAU_" + observer, "LT+S", observer)
-    subsolar_lon = spice.reclat(subsolar_point[0])[1]
-    if observer == "Jupiter":
-        v = np.linspace(
-            np.pi/2 - (lat_offset + np.pi/(20*lat_portion)),   # co-lat upper bound
-            np.pi/2 - (lat_offset - np.pi/(20*lat_portion)),   # co-lat lower bound
-            res
-        )
-    else:
-        v = np.linspace(
-            np.pi/2 - (lat_offset + np.pi/2),   # = 0
-            np.pi/2 - (lat_offset - np.pi/2),   # = pi
-            res
-        )
+    U = lon_grid
+    V = np.pi/2 - lat_grid  # geographic latitude -> colatitude
 
-    u = np.linspace(
-        subsolar_lon + lon_offset - np.pi/lon_portion,
-        subsolar_lon + lon_offset + np.pi/lon_portion,
-        res
-    )
-
-    U, V = np.meshgrid(u, v)
     Xs = r * np.cos(U) * np.sin(V)
     Ys = r * np.sin(U) * np.sin(V)
     Zs = r * np.cos(V)
-
-    # For each sphere grid point, find nearest srf_point and use its blocked value
-    tree = cKDTree(np.column_stack([x, y, z]))
-    grid_pts = np.column_stack([Xs.ravel(), Ys.ravel(), Zs.ravel()])
-
+        
     blocker_str = ', '.join(blockers)
 
     fig = plt.figure(figsize=(8, 8))
@@ -468,13 +441,10 @@ def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, 
     cbar_ax.set_ylabel('Illumination (W/m²)')
 
     def blocked_to_facecolors(blocked):
-        _, idxs = tree.query(grid_pts)
-        vals = blocked[idxs].reshape(res, res)
+        vals = blocked.reshape(lon_grid.shape)  # reshape flat array back to grid
         brightness = 1 - vals
-        # plot_surface facecolors expects shape (res-1, res-1, 4)
-        # average 4 corners of each quad cell
         fc = (brightness[:-1, :-1] + brightness[1:, :-1] +
-              brightness[:-1, 1:] + brightness[1:, 1:]) / 4
+            brightness[:-1, 1:] + brightness[1:, 1:]) / 4
         return np.dstack([fc, fc, fc, np.ones_like(fc)])
 
     def make_title(moment):
