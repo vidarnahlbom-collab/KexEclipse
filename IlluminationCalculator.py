@@ -5,11 +5,8 @@ import numpy as np
 import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
 from matplotlib.animation import FuncAnimation
-from mpl_toolkits.mplot3d import Axes3D
-from scipy.interpolate import make_interp_spline
-import mplcursors
+
 
 # Vidar Cardell Nahlbom, Andreas Jensen Herres
 # 2026-03-05
@@ -29,12 +26,52 @@ Compare the ang sep output of JPL to how we see the shadows at the same time (ad
 -- Graph plot of illumination at specific location over time (interpolated function). DONE
 
 // Consider meshgrid to limit see through 
+Did not find a way to do this 
 
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
 
 // Add texture map to planetoids.  
 
 """
+# Spacetime Presets:
+#utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+#observer, blockers = "Europa", ['Jupiter']
+
+#utc = "2026 Mar 07 06:35:33"   # Jupiter eclipsed by Io
+#observer, blockers = "Jupiter", ['Io']
+
+#utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
+#observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
+
+utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
+observer, blockers = "Jupiter", ['Io', 'Callisto']
+
+# Available ouput modes: Still, Slider, Animation
+# Available Presentation ways: 2D, Dots, Surface
+mode = "Slider"
+presentation = "Surface"
+
+# Flags:
+point = False               # Ignores mode and presentation if true
+calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
+half_moon = True     # Chooses if only half the moon should be shown
+
+# Simulation Fidelity:
+resolution = 200       # Number of points in each direction for surface point array, so total number of points is resolution^2
+time_frame = 500   # The time in seconds that the animation includes, back and forth
+time_step = 100     # The time in seconds that each step moves forward with
+
+# Coordinates for Point tracking mode
+lat_deg = 0
+lon_deg = 0
+
+# Surface point map adjusts:
+lat_offset = 2*np.pi/360*(1.2) # Default 0 
+lon_offset = 2*np.pi/360*(7) # Default 0
+lat_portion = 2.5 # Default 1
+lon_portion = 1 + half_moon + 40 # Default 1 + half_moon
+adjust = 3 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
+# OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
 
 def main():
     '''
@@ -44,27 +81,7 @@ def main():
 
     #observer, blockers = select_bodies()
     
-    utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-    observer, blockers = "Europa", ['Jupiter']
-    
-    #utc = "2026 Mar 07 06:16:33"   # Jupiter eclipsed by Io
-    #observer, blockers = "Jupiter", ['Io']
-    
-    #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
-    #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
-    
-    #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
-    #observer, blockers = "Jupiter", ['Io', 'Callisto']
-
-    resolution = 40     # Number of points in each direction for surface point array, so total number of points is resolution^2
-    time_frame = 180   # The time in seconds that the animation includes, back and forth
-    time_step = 1     # The time in seconds that each step moves forward with
-    lat = 0
-    lon = 0
-    mode = "Point"
-    illumination = True     # Chooses if the illumination function is used; better lighting but slower
-    half_moon = True     # Chooses if only half the moon should be shown
-    two_dee = 0 
+    #mode = select_mode()
 
     start_time = time.time()
 
@@ -76,47 +93,46 @@ def main():
     blocked_total = np.array([]) 
     moments = []
 
-    # We only take one single set of surface points, so given a long enough time frame, these should eventually rotate out of sunlight
-    # This because they are body fixed so should rotate with body. 
-    # If eclipse happens on same time frame as bodies day, then our method now with one set of srf points will not capture it as they rotate with the body
-    # Currently srf points are taken in the middle of the desired time frame. 
-    # The other option is to, for every single moment, get new srf points and do calculations with those.
-    # For that, we would have to change the position of the points in the visualization for every moment. 
-    # This would be computationally expensive, and we lose the ability to track a singular coordinate on the surface.
+    solar_constant = get_solar_constant(observer, et)
 
-    if mode == "Point":
-        lon_rad = np.radians(lon)
-        lat_rad = np.radians(lat)
+    if point:
+        # spoint = spice.subslr("NEAR POINT/ELLIPSOID", observer, et, "IAU_" + observer, "LT+S", observer)
+        # lon_rad, lat_rad = spice.reclat(spoint[0])[1:]
+        # lon_deg = spice.dpr() * lon_rad
+        # lat_deg = spice.dpr() * lat_rad
+
+        lon_rad = np.radians(lon_deg)
+        lat_rad = np.radians(lat_deg)
         lonlat = [lon_rad, lat_rad]
         srf_points = np.array(spice.latsrf("ellipsoid", observer, et, "IAU_" + observer, [lonlat]))
     else:
         srf_points, lonlat = create_pos_array(resolution, observer, et, half_moon) 
-    solar_constant = get_solar_constant(observer, et)
     
-    if mode == "Still":
-        blocked_total = blocked_moment(observer, blockers, srf_points, et, 1, illumination)
+    if (mode == "Still" and not point):
+        blocked_total = blocked_moment(observer, blockers, srf_points, et, 1, calculate_illumination)
         moments.append(et)
     else:
         for i, moment in enumerate(range(et-time_frame, et+time_frame+1, time_step)):
-            blocked_at_moment = blocked_moment(observer, blockers, srf_points, moment, i+1, illumination)
+            blocked_at_moment = blocked_moment(observer, blockers, srf_points, moment, i+1, calculate_illumination)
             blocked_total = np.vstack([blocked_total, blocked_at_moment]) if blocked_total.size else blocked_at_moment
             moments.append(moment)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
     
-    if mode == "Point":
+    if point:
         graph_point(lonlat, blocked_total, observer, moments, solar_constant)
-    elif two_dee:
+    elif presentation == "2D":
         graph_2d(lonlat, blocked_total, observer, moments, solar_constant)
-    else:
-        visualize_3D(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant)
+    elif presentation == "Dots":
+        visualize_3D_dots(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant)
+    elif presentation == "Surface":
+        visualize_3D_surface(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant, et)
+
     
-
-
 
 def furnish_kernels():
     '''
-    Furnishes Kernals
+    Furnishes Kernels
     '''
     kernel_dir = "kernels"
     spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
@@ -284,22 +300,21 @@ def create_pos_array(resolution, body, et, half_moon):
     Returns:
         np.ndarray: Array of surface points in km, shape (resolution^2, 3)
     '''
-    portion = 1 + half_moon
 
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
-
+ 
     # Longitudes: only the longitudes of the half of the planetoid facing the sun
     # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole. 
     # We also ignore south and north pole as if they are included they will be included resolution times, one for every longitude.
     # Additonally, if the the body is Jupiter, we only calculate a small band around the equator where transit shadows can occur
     # And we redistribute the surface points. 
     if body == "Jupiter":
-        latitudes = np.linspace(-np.pi/20, np.pi/20, int(float(resolution)/3), endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/portion, subsolar_lon+np.pi/portion, resolution*3, endpoint=True)
+        latitudes = np.linspace(lat_offset-np.pi/(20*lat_portion), lat_offset+np.pi/(20*lat_portion), int(float(resolution)/adjust), endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon+lon_offset-np.pi/lon_portion, subsolar_lon+lon_offset+np.pi/lon_portion, resolution*adjust, endpoint=True)
     else:
-        latitudes = np.linspace(-np.pi/2, np.pi/2, resolution, endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/portion, subsolar_lon+np.pi/portion, resolution, endpoint=True)
+        latitudes = np.linspace(lat_offset-np.pi/2, lat_offset+np.pi/2, resolution, endpoint=False)[1:]
+        longitudes = np.linspace(subsolar_lon+lon_offset-np.pi/lon_portion, subsolar_lon+lon_offset+np.pi/lon_portion, resolution, endpoint=True)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
@@ -392,8 +407,126 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
            partial_overlap)))
 
 
+# All AI basically
+def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant, et):
+    from scipy.spatial import cKDTree
 
-def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant):
+    x = np.array([p[0] for p in srf_points])
+    y = np.array([p[1] for p in srf_points])
+    z = np.array([p[2] for p in srf_points])
+
+    # Get body radius (mean of actual point distances)
+    r = np.mean(np.sqrt(x**2 + y**2 + z**2))
+
+    # Mirror the lat/lon bounds from surface point generation
+    # Build sphere grid
+    res = 200  # increase for smoother surface
+    subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", observer, et, "IAU_" + observer, "LT+S", observer)
+    subsolar_lon = spice.reclat(subsolar_point[0])[1]
+    if observer == "Jupiter":
+        v = np.linspace(
+            np.pi/2 - (lat_offset + np.pi/(20*lat_portion)),   # co-lat upper bound
+            np.pi/2 - (lat_offset - np.pi/(20*lat_portion)),   # co-lat lower bound
+            res
+        )
+    else:
+        v = np.linspace(
+            np.pi/2 - (lat_offset + np.pi/2),   # = 0
+            np.pi/2 - (lat_offset - np.pi/2),   # = pi
+            res
+        )
+
+    u = np.linspace(
+        subsolar_lon + lon_offset - np.pi/lon_portion,
+        subsolar_lon + lon_offset + np.pi/lon_portion,
+        res
+    )
+
+    U, V = np.meshgrid(u, v)
+    Xs = r * np.cos(U) * np.sin(V)
+    Ys = r * np.sin(U) * np.sin(V)
+    Zs = r * np.cos(V)
+
+    # For each sphere grid point, find nearest srf_point and use its blocked value
+    tree = cKDTree(np.column_stack([x, y, z]))
+    grid_pts = np.column_stack([Xs.ravel(), Ys.ravel(), Zs.ravel()])
+
+    blocker_str = ', '.join(blockers)
+
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_box_aspect([1, 1, 1])
+    ax.set_xlabel('X (km)')
+    ax.set_ylabel('Y (km)')
+    ax.set_zlabel('Z (km)')
+
+    cbar_ax = fig.add_axes([0.1, 0.15, 0.03, 0.7])
+    gradient = np.linspace(0, 1, 256).reshape(256, 1)
+    cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
+    cbar_ax.set_xticks([])
+    cbar_ax.set_yticks([0, 255])
+    cbar_ax.set_yticklabels(['0', f'{solar_constant:.1f}'])
+    cbar_ax.set_ylabel('Illumination (W/m²)')
+
+    def blocked_to_facecolors(blocked):
+        _, idxs = tree.query(grid_pts)
+        vals = blocked[idxs].reshape(res, res)
+        brightness = 1 - vals
+        # plot_surface facecolors expects shape (res-1, res-1, 4)
+        # average 4 corners of each quad cell
+        fc = (brightness[:-1, :-1] + brightness[1:, :-1] +
+              brightness[:-1, 1:] + brightness[1:, 1:]) / 4
+        return np.dstack([fc, fc, fc, np.ones_like(fc)])
+
+    def make_title(moment):
+        return f"Sun Blocked Fraction on {observer}\nBlockers: {blocker_str}\nUTC: {spice.et2utc(moment, 'C', 3)}"
+
+    def make_surf(facecolors_array):
+        surf = ax.plot_surface(Xs, Ys, Zs, facecolors=facecolors_array,
+                               shade=False, edgecolor='none')
+        return surf
+
+    match mode:
+        case "Still":
+            make_surf(blocked_to_facecolors(blocked_data))
+            ax.set_title(make_title(moments[0]))
+
+        case "Slider":
+            from matplotlib.widgets import Slider
+            surf = [make_surf(blocked_to_facecolors(blocked_data[0]))]
+            title = ax.set_title(make_title(moments[0]))
+
+            plt.subplots_adjust(bottom=0.25)
+            slider_ax = plt.axes([0.2, 0.1, 0.6, 0.03])
+            slider = Slider(slider_ax, "Time step", 0, len(blocked_data)-1, valinit=0, valstep=1)
+
+            def update_slider(val):
+                idx = int(slider.val)
+                surf[0].remove()
+                surf[0] = make_surf(blocked_to_facecolors(blocked_data[idx]))
+                title.set_text(make_title(moments[idx]))
+                fig.canvas.draw_idle()
+
+            slider.on_changed(update_slider)
+
+        case "Animation":
+            surf = [make_surf(blocked_to_facecolors(blocked_data[0]))]
+            title = ax.set_title(make_title(moments[0]))
+
+            def update_animation(frame):
+                surf[0].remove()
+                surf[0] = make_surf(blocked_to_facecolors(blocked_data[frame]))
+                title.set_text(make_title(moments[frame]))
+                return surf[0],
+
+            ani = FuncAnimation(fig, update_animation, frames=len(blocked_data), interval=100, blit=False)
+
+    set_axes_equal(ax)
+    plt.show()
+
+
+
+def visualize_3D_dots(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant):
     '''
     Visualizes solar eclipse fractions on a planetoid surface.
 
@@ -449,6 +582,7 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode, so
             ax.set_title(make_title(moments[0]))
 
         case "Slider":
+            from matplotlib.widgets import Slider
             # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
             title = ax.set_title(make_title(moments[0]))
@@ -583,6 +717,8 @@ def graph_point(lonlat, blocked_data, body, moments, solar_constant):
         moments (np.ndarray): List of ephemeris times.
         solar_constant (float): Maximum illumination value
     '''
+    import mplcursors
+    from scipy.interpolate import make_interp_spline
     
     illumination = (1 - np.array(blocked_data).squeeze()) * solar_constant
     utc_times = [spice.et2utc(m, 'C', 0) for m in moments]
@@ -638,29 +774,6 @@ def graph_point(lonlat, blocked_data, body, moments, solar_constant):
     plt.tight_layout()
     plt.show()
 
-
-# GPT code commented and understood, but just math, REDUNDANT, MOVED TO get_blocked_fractions_cartesian
-def disk_overlap_fraction(r1, r2, d):
-    """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
-
-    # Check if any overlap is possible
-    if d >= r1 + r2:
-        return 0.0
-
-    # Check if one disk is completely inside the other
-    if d <= abs(r1 - r2):
-        if r2 >= r1: # if r2 is larger than r1, then r1 is completely blocked
-            return 1.0
-        else: # if not then r2 is seen inside r1 and the blocked fraction is the area of r2 divided by the area of r1
-            return (np.pi * r2**2) / (np.pi * r1**2)
-
-    # If there instead is partial overlap. We use some already existing mathematical method to calculate the overlap
-    part1 = r1**2 * np.arccos((d**2 + r1**2 - r2**2) / (2*d*r1))
-    part2 = r2**2 * np.arccos((d**2 + r2**2 - r1**2) / (2*d*r2))
-    part3 = 0.5 * np.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2))
-
-    overlap = part1 + part2 - part3
-    return overlap / (np.pi * r1**2) # Finally, normalize by the area of body1 to get the blocked fraction
 
 
 # VSC code heavily edited, Unused
@@ -763,126 +876,6 @@ def get_disk_properties_radial(observer, body, et, srf_points):
         disk_props.append([body_az, body_el, body_ang_radius])
   
     return disk_props
-
-
-# Slider function made by ChatGPT, REDUNDANT
-def visualize_blocked_fractions_slider(all_blocked, srf_points, observer, blockers, moments):
-
-    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.95
-
-    x = np.array([p[0] for p in srf_points])
-    y = np.array([p[1] for p in srf_points])
-    z = np.array([p[2] for p in srf_points])
-
-    fig = plt.figure(figsize=(8,8))
-    ax = fig.add_subplot(111, projection='3d')
-    plt.subplots_adjust(bottom=0.25)
-
-    ax.set_box_aspect([1,1,1])
-
-    # Initial frame
-    blocked = np.array(all_blocked[0])
-    colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
-
-    scatter = ax.scatter(x, y, z, c=colors, s=20)
-
-    # Transparent sphere
-    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
-    xs = observer_radius * np.cos(u) * np.sin(v)
-    ys = observer_radius * np.sin(u) * np.sin(v)
-    zs = observer_radius * np.cos(v)
-    ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
-
-    ax.set_xlabel('X (km)')
-    ax.set_ylabel('Y (km)')
-    ax.set_zlabel('Z (km)')
-
-    title = ax.set_title("")
-
-    # Slider
-    slider_ax = plt.axes([0.2,0.1,0.6,0.03])
-    slider = Slider(slider_ax, "Time step", 0, len(all_blocked)-1,
-                    valinit=0, valstep=1)
-
-    def update(val):
-
-        idx = int(slider.val)
-        blocked = np.array(all_blocked[idx])
-
-        colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
-
-        scatter.set_color(colors)
-
-        title.set_text(
-            f"Sun Blocked Fraction on {observer}\n"
-            f"Blockers: {', '.join(blockers)}\n"
-            f"ET: {moments[idx]}"
-        )
-
-        fig.canvas.draw_idle()
-
-    slider.on_changed(update)
-
-    plt.show()
-
-
-# Animation function made by ChatGPT, REDUNDANT
-def visualize_blocked_fractions_animation(all_blocked, srf_points, observer, blockers, moments):
-
-    observer_radius = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.95
-
-    x = np.array([p[0] for p in srf_points])
-    y = np.array([p[1] for p in srf_points])
-    z = np.array([p[2] for p in srf_points])
-
-    fig = plt.figure(figsize=(8,8))
-    ax = fig.add_subplot(111, projection='3d')
-
-    ax.set_box_aspect([1,1,1])
-
-    blocked = np.array(all_blocked[0])
-    colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
-
-    scatter = ax.scatter(x, y, z, c=colors, s=20)
-
-    # Transparent sphere
-    u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
-    xs = observer_radius * np.cos(u) * np.sin(v)
-    ys = observer_radius * np.sin(u) * np.sin(v)
-    zs = observer_radius * np.cos(v)
-    #ax.plot_surface(xs, ys, zs, color='gray', alpha=0.1)
-
-    ax.set_xlabel('X (km)')
-    ax.set_ylabel('Y (km)')
-    ax.set_zlabel('Z (km)')
-
-    title = ax.set_title("")
-
-    def update(frame):
-
-        blocked = np.array(all_blocked[frame])
-        colors = np.column_stack([1-blocked, 1-blocked, 1-blocked])
-
-        scatter.set_color(colors)
-
-        title.set_text(
-            f"Sun Blocked Fraction on {observer}\n"
-            f"Blockers: {', '.join(blockers)}\n"
-            f"ET: {moments[frame]}"
-        )
-
-        return scatter,
-
-    ani = FuncAnimation(
-        fig,
-        update,
-        frames=len(all_blocked),
-        interval=100,   # milliseconds between frames
-        blit=False
-    )
-    set_axes_equal(ax)
-    plt.show()
-
 
 
 if __name__ == '__main__':
