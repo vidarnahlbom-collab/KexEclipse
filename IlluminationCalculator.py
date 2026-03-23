@@ -3,35 +3,36 @@ import os
 import math
 import numpy as np
 import time
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.interpolate import make_interp_spline
+import mplcursors
 
 # Vidar Cardell Nahlbom, Andreas Jensen Herres
 # 2026-03-05
 # KEX L5
 
 """ 
-Take into account planetoid rotation during animation. DONE
-
 Add specific observer angles/perspectives 
 So as seen from earth, at snap shot times, like JPL horizon systems 
 Compare the ang sep output of JPL to how we see the shadows at the same time (adjusted for LT) and same observer location, use earth for easy positions. 
 
-Use illumf function to get angles (points for entire moon) DONE
+-- 2D graf of longitudes and latitudes on X and Y, DONE
 
-Added numerical output per point in graf and in data terminal 
+-- Added numerical output per point in graf and in data terminal DONE
 
-Graph plot of illumination at specific location over time (interpolated function). 
+-- Add Solar constant DONE 
 
-Change visualization tool, to get it smoother 
+-- Graph plot of illumination at specific location over time (interpolated function). DONE
 
-Consider meshgrid to limit see through 
+// Consider meshgrid to limit see through 
 
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
 
-Add texture map to planetoids.  
+// Add texture map to planetoids.  
 
 """
 
@@ -55,12 +56,15 @@ def main():
     #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #observer, blockers = "Jupiter", ['Io', 'Callisto']
 
-    resolution = 50     # Number of points in each direction for surface point array, so total number of points is resolution^2
-    time_frame = 180000    # The time in seconds that the animation includes, back and forth
-    time_step = 10000      # The time in seconds that each step moves forward with
-    mode = "Animation"
+    resolution = 40     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    time_frame = 180   # The time in seconds that the animation includes, back and forth
+    time_step = 1     # The time in seconds that each step moves forward with
+    lat = 0
+    lon = 0
+    mode = "Point"
     illumination = True     # Chooses if the illumination function is used; better lighting but slower
-    half_moon = False       # Chooses if only half the moon should be shown
+    half_moon = True     # Chooses if only half the moon should be shown
+    two_dee = 0 
 
     start_time = time.time()
 
@@ -79,7 +83,15 @@ def main():
     # The other option is to, for every single moment, get new srf points and do calculations with those.
     # For that, we would have to change the position of the points in the visualization for every moment. 
     # This would be computationally expensive, and we lose the ability to track a singular coordinate on the surface.
-    srf_points = create_pos_array(resolution, observer, et, half_moon) 
+
+    if mode == "Point":
+        lon_rad = np.radians(lon)
+        lat_rad = np.radians(lat)
+        lonlat = [lon_rad, lat_rad]
+        srf_points = np.array(spice.latsrf("ellipsoid", observer, et, "IAU_" + observer, [lonlat]))
+    else:
+        srf_points, lonlat = create_pos_array(resolution, observer, et, half_moon) 
+    solar_constant = get_solar_constant(observer, et)
     
     if mode == "Still":
         blocked_total = blocked_moment(observer, blockers, srf_points, et, 1, illumination)
@@ -91,8 +103,14 @@ def main():
             moments.append(moment)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
-
-    visualize_3D(blocked_total, srf_points, observer, blockers, moments, mode)
+    
+    if mode == "Point":
+        graph_point(lonlat, blocked_total, observer, moments, solar_constant)
+    elif two_dee:
+        graph_2d(lonlat, blocked_total, observer, moments, solar_constant)
+    else:
+        visualize_3D(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant)
+    
 
 
 
@@ -156,8 +174,26 @@ def select_mode():
 
 
 
+def get_solar_constant(body, et):
+    '''
+    Calculates the average solar irradiance at body distance
+    '''
+    # Solar luminosity constant (W)
+    L_sun = 3.828e26
+
+    # Get Sun–body distance at et
+    pos, _ = spice.spkpos("SUN", et, "J2000", "NONE", body)
+    d_km = spice.vnorm(pos)
+    d_m  = d_km * 1e3
+
+    # Solar irradiance at that distance (W/m²)
+    E = L_sun / (4 * np.pi * d_m**2)
+    return E
+
+
+
 def get_illum(observer, moment, srf_points):
-    """
+    '''
     Returns the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
     
     Args:
@@ -168,7 +204,7 @@ def get_illum(observer, moment, srf_points):
     Returns:
         np.ndarray: Array of flags for if point is illuminated or not
         np.ndarray: Array of incidence angles in radians 
-    """
+    '''
 
     lit_flags = []
     incidence_angles = []
@@ -185,7 +221,7 @@ def get_illum(observer, moment, srf_points):
 
 
 def blocked_moment(observer, blockers, srf_points, moment, iter, illum):
-    """
+    '''
     Calculated % of sunlight hitting the surface at each surface point at a given moment.
     Takes into account eclipses and sun illumination angle. 
 
@@ -197,7 +233,7 @@ def blocked_moment(observer, blockers, srf_points, moment, iter, illum):
 
     Returns:
         np.ndarray: Array of blocked fractions (0 to 1) for each surface point
-    """
+    '''
     blocked_at_moment = np.ones(len(srf_points)) # Default is dark/unlit 
 
     if illum:
@@ -236,9 +272,8 @@ def blocked_moment(observer, blockers, srf_points, moment, iter, illum):
 
 
 
-
 def create_pos_array(resolution, body, et, half_moon):
-    """
+    '''
     Returns an array of surface points facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame.
 
     Args:
@@ -248,7 +283,7 @@ def create_pos_array(resolution, body, et, half_moon):
 
     Returns:
         np.ndarray: Array of surface points in km, shape (resolution^2, 3)
-    """
+    '''
     portion = 1 + half_moon
 
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
@@ -261,7 +296,7 @@ def create_pos_array(resolution, body, et, half_moon):
     # And we redistribute the surface points. 
     if body == "Jupiter":
         latitudes = np.linspace(-np.pi/20, np.pi/20, int(float(resolution)/3), endpoint=False)[1:]
-        longitudes = np.linspace(subsolar_lon-np.pi/2, subsolar_lon+np.pi/2, resolution*3, endpoint=True)
+        longitudes = np.linspace(subsolar_lon-np.pi/portion, subsolar_lon+np.pi/portion, resolution*3, endpoint=True)
     else:
         latitudes = np.linspace(-np.pi/2, np.pi/2, resolution, endpoint=False)[1:]
         longitudes = np.linspace(subsolar_lon-np.pi/portion, subsolar_lon+np.pi/portion, resolution, endpoint=True)
@@ -276,11 +311,25 @@ def create_pos_array(resolution, body, et, half_moon):
 
     srf_points = np.array(spice.latsrf("ellipsoid", body, et, "IAU_" + body, lonlat))
 
-    return srf_points
+    return srf_points, lonlat
 
 
 
 def get_disk_properties_cartesian(observer, body, et, srf_points):
+    '''
+    Returns the coordinates and angular radius in the sky 
+    of the body as seen from every surface point.
+
+    Args:
+        observer (str): Name of the body surface points are on (e.g. "Europa")
+        body (str): Name of the body to calculate disk properties for (e.g. "Jupiter")
+        et (float): Ephemeris time for which to calculate disk properties
+        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
+
+    Returns:
+        list of list: List of [[X,Y,Z], Angular_radius] for every surface point
+    '''
+    
     radii = spice.bodvrd(body, "RADII", 3)[1][0]
     
     relative_positions = []
@@ -302,6 +351,17 @@ def get_disk_properties_cartesian(observer, body, et, srf_points):
 
 
 def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
+    '''
+    Returns the fraction of how blocked body2 is by body1 in every point
+
+    Args: 
+        body1_disk_props (List of Lists): List of [[X,Y,Z], Angular_radius] of body1 in the sky for every surface point
+        body2_disk_props (List of Lists): List of [[X,Y,Z], Angular_radius] of body2 in the sky for every surface point
+
+    Returns: 
+        np.ndarray
+
+    '''
     props1 = np.array(body1_disk_props)
     props2 = np.array(body2_disk_props)
 
@@ -333,8 +393,8 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
 
 
 
-def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
-    """
+def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant):
+    '''
     Visualizes solar eclipse fractions on a planetoid surface.
 
     Args:
@@ -344,8 +404,7 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
         blockers (list of str): Names of blocking bodies.
         moments (list of float): Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
         mode (str): One of 'Still', 'Slider', or 'Animation'.
-    """
-
+    '''
     
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
@@ -370,6 +429,14 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
     #     color='gray', alpha=0.1
     # )
 
+    cbar_ax = fig.add_axes([0.1, 0.15, 0.03, 0.7])  # [left, bottom, width, height]
+    gradient = np.linspace(0, 1, 256).reshape(256, 1)
+    cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
+    cbar_ax.set_xticks([])
+    cbar_ax.set_yticks([0, 255])
+    cbar_ax.set_yticklabels(['0', f'{solar_constant:.1f}'])
+    cbar_ax.set_ylabel('Illumination (W/m²)')
+
     def make_colors(blocked):
         return np.column_stack([1-blocked, 1-blocked, 1-blocked])
 
@@ -378,9 +445,9 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
 
     match mode:
         case "Still":
-            ax.scatter(x, y, z, c=make_colors(blocked_data), s=20)
+            ax.scatter(x, y, z, c=make_colors(blocked_data), s=20)            
             ax.set_title(make_title(moments[0]))
-        
+
         case "Slider":
             # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
@@ -424,13 +491,13 @@ def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
 
 # By Karlo on StackOverflow: https://stackoverflow.com/a/31364297
 def set_axes_equal(ax):
-    """
+    '''
     Make axes of 3D plot have equal scale so that spheres appear as spheres,
     cubes as cubes, etc. 
 
     Input
       ax: a matplotlib axis, e.g., as output from plt.gca().
-    """
+    '''
 
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
@@ -450,6 +517,126 @@ def set_axes_equal(ax):
     ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+
+
+
+def graph_2d(lonlat, blocked_data, body, moments, solar_constant):
+    
+    lonlat = np.array(lonlat)
+    unique_lons = np.unique(lonlat[:, 0])
+    unique_lats = np.unique(lonlat[:, 1])
+    n_lat = len(unique_lats)
+    n_lon = len(unique_lons)
+    illumination = np.array((1 - blocked_data) * solar_constant)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    # --- Still mode ---
+    if moments is None or np.ndim(illumination) == 1:
+        data_2d = illumination.reshape(n_lat, n_lon)
+        img = ax.pcolormesh(
+            np.degrees(unique_lons),
+            np.degrees(unique_lats),
+            data_2d,
+            cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+        )
+        fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
+        ax.set_xlabel("Longitude (°)")
+        ax.set_ylabel("Latitude (°)")
+        ax.set_title(f"{body} — {spice.et2utc(moments[0], 'C', 0)}")
+
+    # --- Animation mode ---
+    else:
+        data_2d = illumination[0].reshape(n_lat, n_lon)
+        img = ax.pcolormesh(
+            np.degrees(unique_lons),
+            np.degrees(unique_lats),
+            data_2d,
+            cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+        )
+        fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
+        ax.set_xlabel("Longitude (°)")
+        ax.set_ylabel("Latitude (°)")
+        title = ax.set_title("")
+
+        def update(frame):
+            data_2d = illumination[frame].reshape(n_lat, n_lon)
+            img.set_array(data_2d.ravel())
+            title.set_text(f"{body} — {spice.et2utc(moments[frame], 'C', 0)}")
+            return img, title
+
+        ani = FuncAnimation(fig, update, frames=len(moments), interval=100, blit=False)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+def graph_point(lonlat, blocked_data, body, moments, solar_constant):
+    '''
+    Plots illumination over time for a single tracked surface point.
+
+    Args:
+        lonlat (List): Single (lon, lat) pair in radians.
+        blocked_data (np.ndarray): 1D array of blocked fractions for every moment.
+        body (str): Name of the observed body.
+        moments (np.ndarray): List of ephemeris times.
+        solar_constant (float): Maximum illumination value
+    '''
+    
+    illumination = (1 - np.array(blocked_data).squeeze()) * solar_constant
+    utc_times = [spice.et2utc(m, 'C', 0) for m in moments]
+
+    # Print table
+    lon_deg = np.degrees(lonlat[0])
+    lat_deg = np.degrees(lonlat[1])
+    print(f"\nTracked point — Lon: {lon_deg:.2f}°  Lat: {lat_deg:.2f}°")
+    print(f"{'UTC':<30} {'Illumination (W/m²)':>20}")
+    print("-" * 52)
+    for utc, val in zip(utc_times, illumination):
+        print(f"{utc:<30} {val:>20.4f}")
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 4))
+
+    # Interpolate for smooth curve
+    x_numeric = np.arange(len(moments))
+    x_fine = np.linspace(0, len(moments) - 1, len(moments) * 10)
+    spline = make_interp_spline(x_numeric, illumination, k=3)
+    illumination_smooth = spline(x_fine)
+
+    # Tick positions and labels (show ~10 evenly spaced)
+    tick_indices = np.linspace(0, len(moments) - 1, min(10, len(moments)), dtype=int)
+    tick_positions = x_fine[np.searchsorted(x_fine, tick_indices)]
+
+    ax.plot(x_fine, illumination_smooth, color='white', linewidth=1.5)
+    scatter = ax.scatter(x_numeric, illumination, color='white', s=20, zorder=3)    
+    cursor = mplcursors.cursor(scatter, hover=True)
+    ax.set_xlim(x_fine[0], x_fine[-1])
+    ax.set_ylim(0, solar_constant * 1.05)
+    ax.set_xticks(tick_indices)
+    ax.set_xticklabels([utc_times[i] for i in tick_indices], rotation=30, ha='right', fontsize=8)
+    ax.set_ylabel('Illumination (W/m²)')
+    ax.set_title(f"{body} — Lon: {lon_deg:.2f}°  Lat: {lat_deg:.2f}°")
+    ax.set_facecolor('black')
+    fig.patch.set_facecolor('black')
+    ax.tick_params(colors='white')
+    ax.yaxis.label.set_color('white')
+    ax.title.set_color('white')
+    for spine in ax.spines.values():
+        spine.set_edgecolor('white')
+
+    @cursor.connect("add")
+    def on_add(sel):
+        idx = sel.index
+        sel.annotation.set_text(
+            f"{utc_times[idx]}\n{illumination[idx]:.2f} W/m²"
+        )
+        sel.annotation.get_bbox_patch().set(fc="black", alpha=0.8)
+        sel.annotation.set_color("white")
+
+    plt.tight_layout()
+    plt.show()
 
 
 # GPT code commented and understood, but just math, REDUNDANT, MOVED TO get_blocked_fractions_cartesian
