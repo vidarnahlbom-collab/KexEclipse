@@ -13,7 +13,7 @@ from matplotlib.animation import FuncAnimation
 # KEX L5
 
 """ 
-Add specific observer angles/perspectives 
+-- Add specific observer angles/perspectives DONE
 So as seen from earth, at snap shot times, like JPL horizon systems 
 Compare the ang sep output of JPL to how we see the shadows at the same time (adjusted for LT) and same observer location, use earth for easy positions. 
 
@@ -25,8 +25,7 @@ Compare the ang sep output of JPL to how we see the shadows at the same time (ad
 
 -- Graph plot of illumination at specific location over time (interpolated function). DONE
 
-// Consider meshgrid to limit see through 
-Did not find a way to do this 
+-- Consider meshgrid to limit see through DONE
 
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
 
