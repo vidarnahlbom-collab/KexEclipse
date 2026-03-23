@@ -13,7 +13,7 @@ from mpl_toolkits.mplot3d import Axes3D
 # KEX L5
 
 """ 
-Take into account planetoid rotation during animation. DONE?
+Take into account planetoid rotation during animation. DONE
 
 Add specific observer angles/perspectives 
 So as seen from earth, at snap shot times, like JPL horizon systems 
@@ -43,21 +43,21 @@ def main():
 
     #observer, blockers = select_bodies()
     
-    #utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-    #observer, blockers = "Europa", ['Jupiter']
+    utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+    observer, blockers = "Europa", ['Jupiter']
     
     #utc = "2026 Mar 07 06:16:33"   # Jupiter eclipsed by Io
     #observer, blockers = "Jupiter", ['Io']
     
-    utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
-    observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
+    #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
+    #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
     
     #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #observer, blockers = "Jupiter", ['Io', 'Callisto']
 
-    resolution = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
-    time_frame = 180    # The time in seconds that the animation includes, back and forth
-    time_step = 10      # The time in seconds that each step moves forward with
+    resolution = 50     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    time_frame = 180000    # The time in seconds that the animation includes, back and forth
+    time_step = 10000      # The time in seconds that each step moves forward with
     mode = "Animation"
     illumination = True     # Chooses if the illumination function is used; better lighting but slower
     half_moon = False       # Chooses if only half the moon should be shown
@@ -332,30 +332,6 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
            partial_overlap)))
 
 
-# GPT code commented and understood, but just math, REDUNDANT, MOVED TO get_blocked_fractions_cartesian
-def disk_overlap_fraction(r1, r2, d):
-    """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
-
-    # Check if any overlap is possible
-    if d >= r1 + r2:
-        return 0.0
-
-    # Check if one disk is completely inside the other
-    if d <= abs(r1 - r2):
-        if r2 >= r1: # if r2 is larger than r1, then r1 is completely blocked
-            return 1.0
-        else: # if not then r2 is seen inside r1 and the blocked fraction is the area of r2 divided by the area of r1
-            return (np.pi * r2**2) / (np.pi * r1**2)
-
-    # If there instead is partial overlap. We use some already existing mathematical method to calculate the overlap
-    part1 = r1**2 * np.arccos((d**2 + r1**2 - r2**2) / (2*d*r1))
-    part2 = r2**2 * np.arccos((d**2 + r2**2 - r1**2) / (2*d*r2))
-    part3 = 0.5 * np.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2))
-
-    overlap = part1 + part2 - part3
-    return overlap / (np.pi * r1**2) # Finally, normalize by the area of body1 to get the blocked fraction
-
-
 
 def visualize_3D(blocked_data, srf_points, observer, blockers, moments, mode):
     """
@@ -475,6 +451,29 @@ def set_axes_equal(ax):
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
+
+# GPT code commented and understood, but just math, REDUNDANT, MOVED TO get_blocked_fractions_cartesian
+def disk_overlap_fraction(r1, r2, d):
+    """Fraction of disk with radius r1 that is blocked by disk with radius r2 at angular separation d."""
+
+    # Check if any overlap is possible
+    if d >= r1 + r2:
+        return 0.0
+
+    # Check if one disk is completely inside the other
+    if d <= abs(r1 - r2):
+        if r2 >= r1: # if r2 is larger than r1, then r1 is completely blocked
+            return 1.0
+        else: # if not then r2 is seen inside r1 and the blocked fraction is the area of r2 divided by the area of r1
+            return (np.pi * r2**2) / (np.pi * r1**2)
+
+    # If there instead is partial overlap. We use some already existing mathematical method to calculate the overlap
+    part1 = r1**2 * np.arccos((d**2 + r1**2 - r2**2) / (2*d*r1))
+    part2 = r2**2 * np.arccos((d**2 + r2**2 - r1**2) / (2*d*r2))
+    part3 = 0.5 * np.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2))
+
+    overlap = part1 + part2 - part3
+    return overlap / (np.pi * r1**2) # Finally, normalize by the area of body1 to get the blocked fraction
 
 
 # VSC code heavily edited, Unused
