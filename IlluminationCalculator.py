@@ -56,7 +56,7 @@ calculate_illumination = True     # Chooses if the illumination function is used
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 200       # Number of points in each direction for surface point array, so total number of points is resolution^2
+resolution = 50       # Number of points in each direction for surface point array, so total number of points is resolution^2
 time_frame = 500   # The time in seconds that the animation includes, back and forth
 time_step = 100     # The time in seconds that each step moves forward with
 
@@ -72,7 +72,9 @@ lon_portion = 1 + half_moon + 40 # Default 1 + half_moon
 adjust = 3 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
 # OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
 
-def main():
+
+
+def main() -> None:
     '''
     Main function defining program flow
     '''
@@ -127,11 +129,11 @@ def main():
     elif presentation == "Surface":
         visualize_3D_surface(blocked_total, srf_points, observer, blockers, moments, mode, solar_constant, lon_grid, lat_grid)
 
-    
 
-def furnish_kernels():
+
+def furnish_kernels() -> None:
     '''
-    Furnishes Kernels
+    Furnishes kernels
     '''
     kernel_dir = "kernels"
     spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
@@ -141,9 +143,13 @@ def furnish_kernels():
 
 
 
-def select_bodies():
+def select_bodies() -> tuple[str, list[str]]:
     '''
-    Asks user to select observer and obstructing bodies
+    Asks the user to select observer and obstructing bodies
+
+    Returns:
+        observer (str):         The body which will be observed
+        blockers (list[str]):   The bodies which will be used to block the observer
     '''
     bodies = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
 
@@ -170,10 +176,13 @@ def select_bodies():
     return observer, blockers
 
 
-
-def select_mode():
+# unused at the moment
+def select_mode() -> str:
     '''
-    Asks the user how they wish to display the result
+    Asks the user how they wish to display the result (Still, Slider or Animation)
+
+    Returns:
+        mode (str):     The mode that will be used to display
     '''
     modes = ["Still", "Slider", "Animation"]
 
@@ -189,40 +198,46 @@ def select_mode():
 
 
 
-def get_solar_constant(body, et):
+def get_solar_constant(body: str, et: int) -> float:
     '''
-    Calculates the average solar irradiance at body distance
+    Calculates the solar irradiance at body position of selected time et
+
+    Args:
+        body (str):     The body that will be observed
+        et (int):       The (ephemeris) time at which the calculation should be made
+    
+    Returns:
+        irradiance (float):     The calculated solar irradiance (W) 
     '''
-    # Solar luminosity constant (W)
-    L_sun = 3.828e26
+    luminosity = 3.828e26       # solar luminosity constant (W)
 
-    # Get Sun–body distance at et
-    pos, _ = spice.spkpos("SUN", et, "J2000", "NONE", body)
-    d_km = spice.vnorm(pos)
-    d_m  = d_km * 1e3
+    # get Sun–body distance at et
+    position, _ = spice.spkpos("SUN", et, "J2000", "NONE", body)
+    distance = spice.vnorm(position) * 1000      # distance in metres
 
-    # Solar irradiance at that distance (W/m²)
-    E = L_sun / (4 * np.pi * d_m**2)
-    return E
+    # solar irradiance at that distance (W/m²)
+    irradiance = luminosity / (4 * np.pi * distance**2)     # area of sphere
+    return irradiance
 
 
 
-def get_illum(observer, moment, srf_points):
+def get_illum(observer: str, moment: int, srf_points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     '''
-    Returns the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
+    Calculated the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
     
     Args:
-        observer (str): Name of the body surface points are on (e.g. "Europa")
-        moment (int): Ephemeris time for which to calculate illumination data
-        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
+        observer (str):                                     Name of the body that the surface points are on
+        moment (int):                                       Ephemeris time for which to calculate illumination data
+        srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
 
     Returns:
-        np.ndarray: Array of flags for if point is illuminated or not
-        np.ndarray: Array of incidence angles in radians 
+        _ (np.ndarray[np.bool]):        Array of flags for if point is illuminated or not
+        _ (np.ndarray[np.float64]):     Array of incidence angles in radians 
     '''
-
+    
     lit_flags = []
     incidence_angles = []
+
     for srf_point in srf_points:
         # Currently most of output is not used, observer is technically sun, but in out code observer is moon.
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
@@ -231,23 +246,26 @@ def get_illum(observer, moment, srf_points):
         )
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
+
     return np.array(lit_flags), np.array(incidence_angles)
 
 
 
-def blocked_moment(observer, blockers, srf_points, moment, iter, illum):
+def blocked_moment(observer: str, blockers: list[str], srf_points: np.ndarray, moment: float, iter: int, illum: bool) -> np.ndarray:
     '''
-    Calculated % of sunlight hitting the surface at each surface point at a given moment.
-    Takes into account eclipses and sun illumination angle. 
+    Calculates % of sunlight hitting the surface at each surface point at a given moment.
+    Takes into account eclipses and sun illumination angle.
 
     Args:
-        observer (str): Name of the body surface points are on (e.g. "Europa")
-        blockers (list of str): Names of blocking bodies (e.g. ["Jupiter", "Io"])
-        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
-        moment (float): Ephemeris time for which to calculate blocked fractions
+        observer (str):                                     Name of the body that the surface points are on
+        blockers (list[str]):                               Names of obstructing bodies
+        srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
+        moment (float):                                     Ephemeris time for which to calculate blocked fractions
+        iter (int):                                         The iteration which is calculated
+        illum (bool):                                       Whether the illumf() function should be used or not
 
     Returns:
-        np.ndarray: Array of blocked fractions (0 to 1) for each surface point
+        blocked_at_moment (np.ndarray[float64]):    Array of blocked fractions (0 to 1) for each surface point
     '''
     blocked_at_moment = np.ones(len(srf_points)) # Default is dark/unlit 
 
@@ -289,15 +307,18 @@ def blocked_moment(observer, blockers, srf_points, moment, iter, illum):
 
 def create_pos_array(resolution, body, et, half_moon):
     '''
-    Returns an array of surface points facing the sun at the given time in Cartesian coordinates in the IAU body fixed frame.
+    Creates an array of surface points facing the sun at the given time, in Cartesian coordinates in the IAU body fixed frame.
 
     Args:
-        resolution (int): Number of points in each direction for surface point array, so total number of points is resolution^2
-        body (str): Name of the body to calculate surface points for (e.g. "Europa")
-        et (float): Ephemeris time for which to calculate surface points
+        resolution (int):   Number of points in each direction for surface point array, total number of points is resolution^2
+        body (str):         Name of the body to calculate surface points for
+        et (float):         Ephemeris time for which to calculate surface points
 
     Returns:
-        np.ndarray: Array of surface points in km, shape (resolution^2, 3)
+        srf_point (np.ndarray[np.ndarray[np.float64]]):     Array of surface points in km, shape (resolution^2, 3)
+        lonlat (list[list[float]]):                         -
+        lon_grid (np.ndarray[np.ndarray[np.float64]]):      -
+        lat_grid (np.ndarray[np.ndarray[np.float64]]):      -
     '''
 
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
@@ -331,19 +352,17 @@ def create_pos_array(resolution, body, et, half_moon):
 
 def get_disk_properties_cartesian(observer, body, et, srf_points):
     '''
-    Returns the coordinates and angular radius in the sky 
-    of the body as seen from every surface point.
+    Returns the coordinates and angular radius in the sky of the body as seen from every surface point.
 
     Args:
-        observer (str): Name of the body surface points are on (e.g. "Europa")
-        body (str): Name of the body to calculate disk properties for (e.g. "Jupiter")
-        et (float): Ephemeris time for which to calculate disk properties
-        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
+        observer (str):                                     Name of the body the surface points are on
+        body (str):                                         Name of the body to calculate disk properties for
+        et (float):                                         Ephemeris time for which to calculate disk properties
+        srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
 
     Returns:
-        list of list: List of [[X,Y,Z], Angular_radius] for every surface point
+        _ (np.ndarray[np.ndarray[np.float64]]):     List of [[X,Y,Z], Angular_radius] for every surface point
     '''
-    
     radii = spice.bodvrd(body, "RADII", 3)[1][0]
     
     relative_positions = []
@@ -359,7 +378,7 @@ def get_disk_properties_cartesian(observer, body, et, srf_points):
     distances = np.linalg.norm(relative_positions, axis=1)          # Shape (N, )
     norm_rel_pos = relative_positions / distances[:, np.newaxis]    # Shape (N,3)
     ang_radii = np.arctan(radii / distances) # answer in radians      Shape (N, )
-                    
+               
     return np.column_stack([norm_rel_pos, ang_radii])               # Shape (N,4)
 
 
@@ -369,12 +388,11 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
     Returns the fraction of how blocked body2 is by body1 in every point
 
     Args: 
-        body1_disk_props (List of Lists): List of [[X,Y,Z], Angular_radius] of body1 in the sky for every surface point
-        body2_disk_props (List of Lists): List of [[X,Y,Z], Angular_radius] of body2 in the sky for every surface point
+        body1_disk_props (np.ndarray[np.ndarray[np.float64]]):  List of [[X,Y,Z], Angular_radius] of body1 in the sky for every surface point
+        body2_disk_props (np.ndarray[np.ndarray[np.float64]]):  List of [[X,Y,Z], Angular_radius] of body2 in the sky for every surface point
 
     Returns: 
-        np.ndarray
-
+        _ (np.ndarray[np.float64]):     Array of blocked fractions for every point
     '''
     props1 = np.array(body1_disk_props)
     props2 = np.array(body2_disk_props)
@@ -408,6 +426,20 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
 
 # All AI basically
 def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant, lon_grid, lat_grid):
+    '''
+    
+
+    Args:
+        blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
+        srf_points (np.ndarray):    Surface points in IAU body-fixed frame, shape (N, 3).
+        observer (str):             Name of the observer body.
+        blockers (list[str]]):      Names of blocking bodies.
+        moments (list[float]):      Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
+        mode (str):                 One of 'Still', 'Slider', or 'Animation'.
+        solar_constant (float):     The irradiance at the body.
+        lon_grid(np.ndarray):       -
+        lat_grid(np.ndarray):       -
+    '''
     
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
@@ -500,12 +532,13 @@ def visualize_3D_dots(blocked_data, srf_points, observer, blockers, moments, mod
     Visualizes solar eclipse fractions on a planetoid surface.
 
     Args:
-        blocked_data (np.ndarray): For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
-        srf_points (np.ndarray): Surface points in IAU body-fixed frame, shape (N, 3).
-        observer (str): Name of the observer body.
-        blockers (list of str): Names of blocking bodies.
-        moments (list of float): Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
-        mode (str): One of 'Still', 'Slider', or 'Animation'.
+        blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
+        srf_points (np.ndarray):    Surface points in IAU body-fixed frame, shape (N, 3).
+        observer (str):             Name of the observer body.
+        blockers (list[str]]):      Names of blocking bodies.
+        moments (list[float]):      Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
+        mode (str):                 One of 'Still', 'Slider', or 'Animation'.
+        solar_constant (float):     The irradiance at the body.
     '''
     
     x = np.array([p[0] for p in srf_points])
@@ -595,13 +628,12 @@ def visualize_3D_dots(blocked_data, srf_points, observer, blockers, moments, mod
 # By Karlo on StackOverflow: https://stackoverflow.com/a/31364297
 def set_axes_equal(ax):
     '''
-    Make axes of 3D plot have equal scale so that spheres appear as spheres,
-    cubes as cubes, etc. 
+    Make axes of 3D plot have equal scale so that spheres appear as spheres, cubes as cubes, etc. 
 
-    Input
-      ax: a matplotlib axis, e.g., as output from plt.gca().
+    Args:
+        ax (mpl_toolkits.mplot3d.axes3d.Axes3D):     a matplotlib axis, e.g., as output from plt.gca().
     '''
-
+    
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
     z_limits = ax.get_zlim3d()
@@ -624,6 +656,16 @@ def set_axes_equal(ax):
 
 
 def graph_2d(lonlat, blocked_data, body, moments, solar_constant):
+    '''
+    Plots the 
+
+    Args:
+        lonlat ():
+        blocked_data ():
+        body (str):
+        moments ():
+        solar_constant (float):
+    '''
     
     lonlat = np.array(lonlat)
     unique_lons = np.unique(lonlat[:, 0])
@@ -680,11 +722,11 @@ def graph_point(lonlat, blocked_data, body, moments, solar_constant):
     Plots illumination over time for a single tracked surface point.
 
     Args:
-        lonlat (List): Single (lon, lat) pair in radians.
-        blocked_data (np.ndarray): 1D array of blocked fractions for every moment.
-        body (str): Name of the observed body.
-        moments (np.ndarray): List of ephemeris times.
-        solar_constant (float): Maximum illumination value
+        lonlat (lst):               Single (lon, lat) pair in radians.
+        blocked_data (np.ndarray):  1D array of blocked fractions for every moment.
+        body (str):                 Name of the observed body.
+        moments (np.ndarray):       List of ephemeris times.
+        solar_constant (float):     Maximum illumination value.
     '''
     import mplcursors
     from scipy.interpolate import make_interp_spline
@@ -745,7 +787,7 @@ def graph_point(lonlat, blocked_data, body, moments, solar_constant):
 
 
 
-# VSC code heavily edited, Unused
+# VSC code heavily edited, unused
 def get_blocked_fractions_radial(body1_disk_props, body2_disk_props):
     """
     Calculates what fraction of body1 is blocked by body2 at each surface point.
