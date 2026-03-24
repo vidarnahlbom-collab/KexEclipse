@@ -223,7 +223,7 @@ def get_solar_constant(body: str, et: int) -> float:
 
 def get_illum(observer: str, moment: int, srf_points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     '''
-    Calculated the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
+    Calculates the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
     
     Args:
         observer (str):                                     Name of the body that the surface points are on
@@ -313,6 +313,7 @@ def create_pos_array(resolution, body, et, half_moon):
         resolution (int):   Number of points in each direction for surface point array, total number of points is resolution^2
         body (str):         Name of the body to calculate surface points for
         et (float):         Ephemeris time for which to calculate surface points
+        half_moon (bool):   Whether only half the moon should be shown
 
     Returns:
         srf_point (np.ndarray[np.ndarray[np.float64]]):     Array of surface points in km, shape (resolution^2, 3)
@@ -427,7 +428,7 @@ def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
 # All AI basically
 def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant, lon_grid, lat_grid):
     '''
-    
+    Plots part of the surface in 3D, with illumination
 
     Args:
         blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
@@ -440,7 +441,7 @@ def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, 
         lon_grid(np.ndarray):       -
         lat_grid(np.ndarray):       -
     '''
-    
+
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
@@ -657,14 +658,14 @@ def set_axes_equal(ax):
 
 def graph_2d(lonlat, blocked_data, body, moments, solar_constant):
     '''
-    Plots the 
+    Plots the 2D surface of the entire body, with illumination
 
     Args:
-        lonlat ():
-        blocked_data ():
-        body (str):
-        moments ():
-        solar_constant (float):
+        lonlat ():                  -
+        blocked_data ():            -
+        body (str):                 -
+        moments ():                 -
+        solar_constant (float):     -
     '''
     
     lonlat = np.array(lonlat)
