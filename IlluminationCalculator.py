@@ -32,8 +32,8 @@ Add possibility to output illumination of a flat plane at the center of the moon
 
 """
 # Spacetime Presets:
-#utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-#observer, blockers = "Europa", ['Jupiter']
+utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+observer, blockers = "Europa", ['Jupiter']
 
 #utc = "2026 Mar 07 06:35:33"   # Jupiter eclipsed by Io
 #observer, blockers = "Jupiter", ['Io']
@@ -41,33 +41,33 @@ Add possibility to output illumination of a flat plane at the center of the moon
 #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
 #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
 
-utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
-observer, blockers = "Jupiter", ['Io', 'Callisto']
+#utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
+#observer, blockers = "Jupiter", ['Io', 'Callisto']
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
 mode = "Slider"
-presentation = "2D"
+presentation = "Dots"
 
 # Flags:
-point = True               # Ignores mode and presentation if true
+point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
 calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 10       # Number of points in each direction for surface point array, so total number of points is resolution^2
-time_frame = 1000   # The time in seconds that the animation includes, back and forth
-time_step = 1000     # The time in seconds that each step moves forward with
+resolution = 50       # Number of points in each direction for surface point array, so total number of points is resolution^2
+time_frame = 150   # The time in seconds that the animation includes, back and forth
+time_step = 100     # The time in seconds that each step moves forward with
 
 # Coordinates for Point tracking mode
 lat_deg = 0
 lon_deg = 0
 
 # Surface point map adjusts:
-lat_offset = 2*np.pi/360*(1.2) # Default 0 
-lon_offset = 2*np.pi/360*(7) # Default 0
-lat_portion = 2.5 # Default 1
-lon_portion = 1 + half_moon + 40 # Default 1 + half_moon
+lat_offset = 2*np.pi/360*(0) # Default 0 (double shadow 1.2)
+lon_offset = 2*np.pi/360*(0) # Default 0 (double shadow 7)
+lat_portion = 1 # Default 1 (double shadow 2.5)
+lon_portion = 1 + half_moon + 0 # Default 1 + half_moon (double shadow +40)
 adjust = 3 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
 # OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
 
@@ -470,23 +470,23 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
 
-    U = lon_grid
-    V = np.pi/2 - lat_grid  # geographic latitude -> colatitude
+    u = lon_grid
+    v = np.pi/2 - lat_grid  # geographic latitude -> colatitude
 
-    Xs = r * np.cos(U) * np.sin(V)
-    Ys = r * np.sin(U) * np.sin(V)
-    Zs = r * np.cos(V)
+    Xs = r * np.cos(u) * np.sin(v)
+    Ys = r * np.sin(u) * np.sin(v)
+    Zs = r * np.cos(v)
         
     blocker_str = ', '.join(blockers)
 
-    fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_box_aspect([1, 1, 1])
+    fig = plt.figure(figsize=(12, 9))
+    ax = fig.add_axes([0.0, 0.0, 0.78, 1.0], projection='3d')
+
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
     ax.set_zlabel('Z (km)')
 
-    cbar_ax = fig.add_axes([0.1, 0.15, 0.03, 0.7])
+    cbar_ax = fig.add_axes([0.82, 0.15, 0.03, 0.55])
     gradient = np.linspace(0, 1, 256).reshape(256, 1)
     cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
     cbar_ax.set_xticks([])
@@ -509,42 +509,54 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                                shade=False, edgecolor='none')
         return surf
 
+    title = fig.text(0.83, 0.92, make_title(moments[0]), 
+                 fontsize=15, va='top', ha='left', 
+                 wrap=True, linespacing=1.6)
+
     match mode:
         case "Still":
             make_surf(blocked_to_facecolors(blocked_data))
-            ax.set_title(make_title(moments[0]))
 
         case "Slider":
             from matplotlib.widgets import Slider
-            surf = [make_surf(blocked_to_facecolors(blocked_data[0]))]
-            title = ax.set_title(make_title(moments[0]))
+            surf = make_surf(blocked_to_facecolors(blocked_data[0]))
 
             plt.subplots_adjust(bottom=0.25)
-            slider_ax = plt.axes([0.2, 0.1, 0.6, 0.03])
+            slider_ax = plt.axes([0.82, 0.08, 0.14, 0.03])
             slider = Slider(slider_ax, "Time step", 0, len(blocked_data)-1, valinit=0, valstep=1)
 
             def update_slider(val):
                 idx = int(slider.val)
-                surf[0].remove()
-                surf[0] = make_surf(blocked_to_facecolors(blocked_data[idx]))
+                face_colors = blocked_to_facecolors(blocked_data[idx]).reshape(-1, 4)
+                surf.set_facecolor(face_colors)
                 title.set_text(make_title(moments[idx]))
                 fig.canvas.draw_idle()
 
             slider.on_changed(update_slider)
 
         case "Animation":
-            surf = [make_surf(blocked_to_facecolors(blocked_data[0]))]
-            title = ax.set_title(make_title(moments[0]))
+            surf = make_surf(blocked_to_facecolors(blocked_data[0]))
 
             def update_animation(frame):
-                surf[0].remove()
-                surf[0] = make_surf(blocked_to_facecolors(blocked_data[frame]))
+                face_colors = blocked_to_facecolors(blocked_data[frame]).reshape(-1, 4)
+                surf.set_facecolor(face_colors)
                 title.set_text(make_title(moments[frame]))
-                return surf[0],
+                return surf,
 
             ani = FuncAnimation(fig, update_animation, frames=len(blocked_data), interval=100, blit=False)
 
-    set_axes_equal(ax)
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+
+    x_range = abs(x_limits[1] - x_limits[0])
+    y_range = abs(y_limits[1] - y_limits[0])
+    z_range = abs(z_limits[1] - z_limits[0])
+
+    ax.set_box_aspect([x_range, y_range, z_range])
+    #fig.tight_layout(rect=[0.0, 0.0, 1.5, 1.0])
+    #fig.tight_layout(rect=[-0.5, -0.5, 2, 2])
+
     plt.show()
 
 
@@ -574,9 +586,9 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
     blocker_str = ', '.join(blockers)
 
-    fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_box_aspect([1, 1, 1])
+    fig = plt.figure(figsize=(12, 9))
+    ax = fig.add_axes([0.0, 0.0, 0.78, 1.0], projection='3d')
+
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
     ax.set_zlabel('Z (km)')
@@ -591,7 +603,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     #     color='gray', alpha=0.1
     # )
 
-    cbar_ax = fig.add_axes([0.1, 0.15, 0.03, 0.7])  # [left, bottom, width, height]
+    cbar_ax = fig.add_axes([0.82, 0.15, 0.03, 0.55])  # [left, bottom, width, height]
     gradient = np.linspace(0, 1, 256).reshape(256, 1)
     cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
     cbar_ax.set_xticks([])
@@ -605,19 +617,21 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     def make_title(moment):
         return f"Sun Blocked Fraction on {observer}\nBlockers: {blocker_str}\nUTC: {spice.et2utc(moment, 'C', 3)}"
 
+    title = fig.text(0.83, 0.92, make_title(moments[0]), 
+                 fontsize=15, va='top', ha='left', 
+                 wrap=True, linespacing=1.6)
+
     match mode:
         case "Still":
             ax.scatter(x, y, z, c=make_colors(blocked_data), s=20)            
-            ax.set_title(make_title(moments[0]))
 
         case "Slider":
             # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
-            title = ax.set_title(make_title(moments[0]))
 
             # Slider
             plt.subplots_adjust(bottom=0.25)
-            slider_ax = plt.axes([0.2, 0.1, 0.6, 0.03])
+            slider_ax = plt.axes([0.82, 0.08, 0.14, 0.03])
             slider = Slider(slider_ax, "Time step", 0, len(blocked_data)-1, valinit=0, valstep=1)
             
             def update_slider(val):
@@ -631,7 +645,6 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
         case "Animation":
             # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
-            title = ax.set_title(make_title(moments[0]))
         
             # Animation
             def update_animation(frame):
@@ -647,36 +660,17 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                 blit=False
             )
         
-    set_axes_equal(ax)
-    plt.show()
-
-
-# By Karlo on StackOverflow: https://stackoverflow.com/a/31364297
-def set_axes_equal(ax):
-    '''
-    Make axes of 3D plot have equal scale so that spheres appear as spheres, cubes as cubes, etc. 
-
-    Args:
-        ax (mpl_toolkits.mplot3d.axes3d.Axes3D):     a matplotlib axis, e.g., as output from plt.gca().
-    '''
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
     z_limits = ax.get_zlim3d()
 
     x_range = abs(x_limits[1] - x_limits[0])
-    x_middle = np.mean(x_limits)
     y_range = abs(y_limits[1] - y_limits[0])
-    y_middle = np.mean(y_limits)
     z_range = abs(z_limits[1] - z_limits[0])
-    z_middle = np.mean(z_limits)
 
-    # The plot bounding box is a sphere in the sense of the infinity
-    # norm, hence I call half the max range the plot radius.
-    plot_radius = 0.5*max([x_range, y_range, z_range])
+    ax.set_box_aspect([x_range, y_range, z_range])
 
-    ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
-    ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
-    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+    plt.show()
 
 
 
