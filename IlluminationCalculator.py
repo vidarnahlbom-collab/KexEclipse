@@ -3,6 +3,7 @@ import os
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
 from matplotlib.animation import FuncAnimation
 
 
@@ -45,18 +46,18 @@ observer, blockers = "Jupiter", ['Io', 'Callisto']
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Still"
+mode = "Slider"
 presentation = "2D"
 
 # Flags:
-point = False               # Ignores mode and presentation if true
+point = True               # Ignores mode and presentation if true
 calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 500       # Number of points in each direction for surface point array, so total number of points is resolution^2
-time_frame = 500   # The time in seconds that the animation includes, back and forth
-time_step = 100     # The time in seconds that each step moves forward with
+resolution = 10       # Number of points in each direction for surface point array, so total number of points is resolution^2
+time_frame = 1000   # The time in seconds that the animation includes, back and forth
+time_step = 1000     # The time in seconds that each step moves forward with
 
 # Coordinates for Point tracking mode
 lat_deg = 0
@@ -598,7 +599,6 @@ def visualize_3D_dots(blocked_data, srf_points, observer, blockers, moments, mod
             ax.set_title(make_title(moments[0]))
 
         case "Slider":
-            from matplotlib.widgets import Slider
             # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
             title = ax.set_title(make_title(moments[0]))
@@ -692,42 +692,65 @@ def graph_2d(longitudes: np.ndarray[np.float64],
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    # --- Still mode ---
-    if moments is None or np.ndim(illumination) == 1:
-        data_2d = illumination.reshape(n_lat, n_lon)
-        img = ax.pcolormesh(
-            np.degrees(longitudes),
-            np.degrees(latitudes),
-            data_2d,
-            cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
-        )
-        fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
-        ax.set_xlabel("Longitude (°)")
-        ax.set_ylabel("Latitude (°)")
-        ax.set_title(f"{body} — {spice.et2utc(moments[0], 'C', 0)}")
+    match mode:
+        case "Still":
+            data_2d = illumination.reshape(n_lat, n_lon)
+            img = ax.pcolormesh(
+                np.degrees(longitudes),
+                np.degrees(latitudes),
+                data_2d,
+                cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+            )
+            fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
+            ax.set_xlabel("Longitude (°)")
+            ax.set_ylabel("Latitude (°)")
+            ax.set_title(f"{body} — {spice.et2utc(moments[0], 'C', 0)}")
 
-    # --- Animation mode ---
-    else:
-        data_2d = illumination[0].reshape(n_lat, n_lon)
-        img = ax.pcolormesh(
-            np.degrees(longitudes),
-            np.degrees(latitudes),
-            data_2d,
-            cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
-        )
-        fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
-        ax.set_xlabel("Longitude (°)")
-        ax.set_ylabel("Latitude (°)")
-        title = ax.set_title("")
+        case "Slider":
+            data_2d = illumination[0].reshape(n_lat, n_lon)
+            img = ax.pcolormesh(
+                np.degrees(longitudes),
+                np.degrees(latitudes),
+                data_2d,
+                cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+            )
+            fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
+            ax.set_xlabel("Longitude (°)")
+            ax.set_ylabel("Latitude (°)")
+            title = ax.set_title(f"{body} — {spice.et2utc(moments[0], 'C', 0)}")
 
-        def update(frame):
-            data_2d = illumination[frame].reshape(n_lat, n_lon)
-            img.set_array(data_2d.ravel())
-            title.set_text(f"{body} — {spice.et2utc(moments[frame], 'C', 0)}")
-            return img, title
+            plt.subplots_adjust(bottom=0.25)
+            slider_ax = plt.axes([0.2, 0.0, 0.6, 0.03])
+            slider = Slider(slider_ax, "Time step", 0, len(moments)-1, valinit=0, valstep=1)
 
-        ani = FuncAnimation(fig, update, frames=len(moments), interval=100, blit=False)
+            def update_slider(val):
+                idx = int(slider.val)
+                img.set_array(illumination[idx].reshape(n_lat, n_lon).ravel())
+                title.set_text(f"{body} — {spice.et2utc(moments[idx], 'C', 0)}")
+                fig.canvas.draw_idle()
 
+            slider.on_changed(update_slider)
+        case "Animation":
+            data_2d = illumination[0].reshape(n_lat, n_lon)
+            img = ax.pcolormesh(
+                np.degrees(longitudes),
+                np.degrees(latitudes),
+                data_2d,
+                cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+            )
+            fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
+            ax.set_xlabel("Longitude (°)")
+            ax.set_ylabel("Latitude (°)")
+            title = ax.set_title("")
+
+            def update(frame):
+                data_2d = illumination[frame].reshape(n_lat, n_lon)
+                img.set_array(data_2d.ravel())
+                title.set_text(f"{body} — {spice.et2utc(moments[frame], 'C', 0)}")
+                return img, title
+
+            ani = FuncAnimation(fig, update, frames=len(moments), interval=100, blit=False)
+        
     plt.tight_layout()
     plt.show()
 
