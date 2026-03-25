@@ -47,7 +47,7 @@ observer, blockers = "Europa", ['Jupiter']
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
 mode = "Slider"
-presentation = "Dots"
+presentation = "Surface"
 
 # Flags:
 point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
@@ -486,7 +486,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     ax.set_ylabel('Y (km)')
     ax.set_zlabel('Z (km)')
 
-    cbar_ax = fig.add_axes([0.82, 0.15, 0.03, 0.55])
+    cbar_ax = fig.add_axes([0.82, 0.15, 0.1, 0.55])
     gradient = np.linspace(0, 1, 256).reshape(256, 1)
     cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
     cbar_ax.set_xticks([])
@@ -603,7 +603,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     #     color='gray', alpha=0.1
     # )
 
-    cbar_ax = fig.add_axes([0.82, 0.15, 0.03, 0.55])  # [left, bottom, width, height]
+    cbar_ax = fig.add_axes([0.82, 0.15, 0.1, 0.55])  # [left, bottom, width, height]
     gradient = np.linspace(0, 1, 256).reshape(256, 1)
     cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
     cbar_ax.set_xticks([])
