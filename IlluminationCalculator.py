@@ -49,7 +49,7 @@ mode = "Animation"
 presentation = "2D"
 
 # Flags:
-point = False               # Ignores mode and presentation if true
+point = True               # Ignores mode and presentation if true
 calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
 half_moon = True     # Chooses if only half the moon should be shown
 
@@ -440,7 +440,15 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
 
 
 # All AI basically
-def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant, longitudes, latitudes):
+def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
+                         srf_points: np.ndarray[np.ndarray[np.float64]],
+                         observer: str,
+                         blockers: list[str],
+                         moments: list[float],
+                         mode: str,
+                         solar_constant,
+                         longitudes: np.ndarray[np.float64],
+                         latitudes: np.ndarray[np.float64]):
     '''
     Plots part of the surface in 3D, with illumination
 
@@ -455,7 +463,6 @@ def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, 
         longitudes (np.ndarray):    Array of longitudes.
         latitudes (np.ndarray):     Array of latitudes.
     '''
-
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
@@ -544,7 +551,13 @@ def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, 
 
 
 
-def visualize_3D_dots(blocked_data, srf_points, observer, blockers, moments, mode, solar_constant):
+def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
+                      srf_points: np.ndarray[np.ndarray[np.float64]],
+                      observer: str,
+                      blockers: list[str],
+                      moments: list[float],
+                      mode: str,
+                      solar_constant: float):
     '''
     Visualizes solar eclipse fractions on a planetoid surface.
 
@@ -557,7 +570,6 @@ def visualize_3D_dots(blocked_data, srf_points, observer, blockers, moments, mod
         mode (str):                 One of 'Still', 'Slider', or 'Animation'.
         solar_constant (float):     The irradiance at the body.
     '''
-    
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
@@ -650,7 +662,6 @@ def set_axes_equal(ax):
     Args:
         ax (mpl_toolkits.mplot3d.axes3d.Axes3D):     a matplotlib axis, e.g., as output from plt.gca().
     '''
-    
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
     z_limits = ax.get_zlim3d()
@@ -736,17 +747,22 @@ def graph_2d(longitudes: np.ndarray[np.float64],
 
 
 
-def graph_point(lon_deg, lat_deg, blocked_data, body, moments, solar_constant):
+def graph_point(lon_deg: int,
+                lat_deg: int,
+                blocked_data: np.ndarray[np.ndarray[np.float64]],
+                body: str,
+                moments: list[int],
+                solar_constant: float):
     '''
     Plots illumination over time for a single tracked surface point.
 
     Args:
-        lon_deg (int):              Longitude of point in degrees.
-        lat_deg (int):              Latitude of point in degrees.
-        blocked_data (np.ndarray):  1D array of blocked fractions for every moment.
-        body (str):                 Name of the observed body.
-        moments (np.ndarray):       List of ephemeris times.
-        solar_constant (float):     Maximum illumination value.
+        lon_deg (int):                                      Longitude of point in degrees.
+        lat_deg (int):                                      Latitude of point in degrees.
+        blocked_data (np.ndarray[np.ndarray[np.float64]]):  2D array of blocked fractions for every moment.
+        body (str):                                         Name of the observed body.
+        moments (list[int]):                                List of ephemeris times.
+        solar_constant (float):                             Maximum illumination value.
     '''
     import mplcursors
     from scipy.interpolate import make_interp_spline
