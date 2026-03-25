@@ -31,8 +31,8 @@ Add possibility to output illumination of a flat plane at the center of the moon
 
 """
 # Spacetime Presets:
-utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-observer, blockers = "Europa", ['Jupiter']
+#utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+#observer, blockers = "Europa", ['Jupiter']
 
 #utc = "2026 Mar 07 06:35:33"   # Jupiter eclipsed by Io
 #observer, blockers = "Jupiter", ['Io']
@@ -40,12 +40,12 @@ observer, blockers = "Europa", ['Jupiter']
 #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
 #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
 
-#utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
-#observer, blockers = "Jupiter", ['Io', 'Callisto']
+utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
+observer, blockers = "Jupiter", ['Io', 'Callisto']
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Animation"
+mode = "Still"
 presentation = "2D"
 
 # Flags:
@@ -54,7 +54,7 @@ calculate_illumination = True     # Chooses if the illumination function is used
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 10       # Number of points in each direction for surface point array, so total number of points is resolution^2
+resolution = 500       # Number of points in each direction for surface point array, so total number of points is resolution^2
 time_frame = 500   # The time in seconds that the animation includes, back and forth
 time_step = 100     # The time in seconds that each step moves forward with
 
@@ -67,7 +67,7 @@ lat_offset = 2*np.pi/360*(1.2) # Default 0
 lon_offset = 2*np.pi/360*(7) # Default 0
 lat_portion = 2.5 # Default 1
 lon_portion = 1 + half_moon + 40 # Default 1 + half_moon
-adjust = 1 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
+adjust = 3 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
 # OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
 
 
@@ -95,15 +95,12 @@ def main() -> None:
     solar_constant = get_solar_constant(observer, et)
 
     if point:
-        # spoint = spice.subslr("NEAR POINT/ELLIPSOID", observer, et, "IAU_" + observer, "LT+S", observer)
+        # spoint = spice.subslr("NEAR POINT/ELLIPSOID", observer, et, "IAU_" + observer, "NONE", observer) # used to have "LT+S
         # lon_rad, lat_rad = spice.reclat(spoint[0])[1:]
         # lon_deg = spice.dpr() * lon_rad
         # lat_deg = spice.dpr() * lat_rad
 
-        lon_rad = np.radians(lon_deg)
-        lat_rad = np.radians(lat_deg)
-        lonlat = [lon_rad, lat_rad]
-        srf_points = np.array(spice.latsrf("ellipsoid", observer, et, "IAU_" + observer, [lonlat]))
+        srf_points = np.array(spice.latsrf("ellipsoid", observer, et, "IAU_" + observer, [[np.radians(lon_deg),np.radians(lat_deg)]]))
     else:
         srf_points, longitudes, latitudes = create_pos_array(resolution, observer, et) 
     
@@ -240,7 +237,7 @@ def get_illum(observer: str, moment: int, srf_points: np.ndarray) -> tuple[np.nd
         # Currently most of output is not used, observer is technically sun, but in out code observer is moon.
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
         _, _, _, incdnc, _, _, lit = spice.illumf(
-            "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "LT+S", "Sun", srf_point
+            "ELLIPSOID", observer, "Sun", moment, "IAU_"+observer, "NONE", "Sun", srf_point # used to have "LT+S"
         )
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
@@ -317,7 +314,7 @@ def create_pos_array(resolution, body, et):
         latitudes (np.ndarray[np.float64]): Array of latitudes used to get surface points
     '''
 
-    subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
+    subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "NONE", body) # used to have "LT+S
     subsolar_lon = spice.reclat(subsolar_point[0])[1]
  
     # Longitudes: only the longitudes of the half of the planetoid facing the sun
@@ -363,7 +360,7 @@ def get_disk_properties(observer, body, et, srf_points):
     
     relative_positions = []
     for point in srf_points:
-        rel_pos = spice.spkcpo(body, et, "IAU_"+observer, "OBSERVER", "LT+S", point, observer, "IAU_"+observer)[0][:3]
+        rel_pos = spice.spkcpo(body, et, "IAU_"+observer, "OBSERVER", "NONE", point, observer, "IAU_"+observer)[0][:3] # used to have "LT+S
         relative_positions.append(rel_pos)
         #body_dis = math.sqrt(body_local_xyz_pos[0]**2 + body_local_xyz_pos[1]**2 + body_local_xyz_pos[2]**2)
         #body_ang_radius = math.atan(radii/body_dis) # In radians
