@@ -282,14 +282,14 @@ def blocked_moment(observer: str, blockers: list[str], srf_points: np.ndarray, m
 
     # We only get disk properties for the lit points
     # Get the disk properties of the sun and blockers as seen from the surface points.
-    sun_disk_props = get_disk_properties_cartesian(observer, "Sun", moment, lit_points)
+    sun_disk_props = get_disk_properties(observer, "Sun", moment, lit_points)
 
     blocked_lit = np.zeros(len(lit_points))
     # For every blocker, calculate the blocked fractions of the sun for every lit point and then combine them 
     for blocker in blockers:
         print(f"Calculating blocked fractions {iter} for {blocker}...")
-        blocker_disk_props = get_disk_properties_cartesian(observer, blocker, moment, lit_points)
-        blocked = get_blocked_fractions_cartesian(sun_disk_props, blocker_disk_props)
+        blocker_disk_props = get_disk_properties(observer, blocker, moment, lit_points)
+        blocked = get_blocked_fractions(sun_disk_props, blocker_disk_props)
         blocked_lit = np.clip(blocked_lit + blocked, 0.0, 1.0)
 
     if illum:
@@ -317,9 +317,9 @@ def create_pos_array(resolution, body, et, half_moon):
 
     Returns:
         srf_point (np.ndarray[np.ndarray[np.float64]]):     Array of surface points in km, shape (resolution^2, 3)
-        lonlat (list[list[float]]):                         -
-        lon_grid (np.ndarray[np.ndarray[np.float64]]):      -
-        lat_grid (np.ndarray[np.ndarray[np.float64]]):      -
+        lonlat (list[list[float]]):                         Used in the 2D graph
+        lon_grid (np.ndarray[np.ndarray[np.float64]]):      Used for surface vizualization
+        lat_grid (np.ndarray[np.ndarray[np.float64]]):      Used for surface visualization
     '''
 
     subsolar_point = spice.subslr("NEAR POINT/ELLIPSOID", body, et, "IAU_" + body, "LT+S", body)
@@ -351,7 +351,7 @@ def create_pos_array(resolution, body, et, half_moon):
 
 
 
-def get_disk_properties_cartesian(observer, body, et, srf_points):
+def get_disk_properties(observer, body, et, srf_points):
     '''
     Returns the coordinates and angular radius in the sky of the body as seen from every surface point.
 
@@ -362,7 +362,7 @@ def get_disk_properties_cartesian(observer, body, et, srf_points):
         srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
 
     Returns:
-        _ (np.ndarray[np.ndarray[np.float64]]):     List of [[X,Y,Z], Angular_radius] for every surface point
+        _ (np.ndarray[np.ndarray[np.float64]]):     List of [[X,Y,Z], angular_radius] for every surface point
     '''
     radii = spice.bodvrd(body, "RADII", 3)[1][0]
     
@@ -384,13 +384,13 @@ def get_disk_properties_cartesian(observer, body, et, srf_points):
 
 
 
-def get_blocked_fractions_cartesian(body1_disk_props, body2_disk_props):
+def get_blocked_fractions(body1_disk_props, body2_disk_props):
     '''
     Returns the fraction of how blocked body2 is by body1 in every point
 
     Args: 
-        body1_disk_props (np.ndarray[np.ndarray[np.float64]]):  List of [[X,Y,Z], Angular_radius] of body1 in the sky for every surface point
-        body2_disk_props (np.ndarray[np.ndarray[np.float64]]):  List of [[X,Y,Z], Angular_radius] of body2 in the sky for every surface point
+        body1_disk_props (np.ndarray[np.ndarray[np.float64]]):  List of [[X,Y,Z], angular_radius] of body1 in the sky for every surface point
+        body2_disk_props (np.ndarray[np.ndarray[np.float64]]):  List of [[X,Y,Z], angular_radius] of body2 in the sky for every surface point
 
     Returns: 
         _ (np.ndarray[np.float64]):     Array of blocked fractions for every point
@@ -438,8 +438,8 @@ def visualize_3D_surface(blocked_data, srf_points, observer, blockers, moments, 
         moments (list[float]):      Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
         mode (str):                 One of 'Still', 'Slider', or 'Animation'.
         solar_constant (float):     The irradiance at the body.
-        lon_grid(np.ndarray):       -
-        lat_grid(np.ndarray):       -
+        lon_grid(np.ndarray):       List of longitudes
+        lat_grid(np.ndarray):       List of latitudes
     '''
 
     x = np.array([p[0] for p in srf_points])
@@ -787,107 +787,6 @@ def graph_point(lonlat, blocked_data, body, moments, solar_constant):
     plt.show()
 
 
-
-# VSC code heavily edited, unused
-def get_blocked_fractions_radial(body1_disk_props, body2_disk_props):
-    """
-    Calculates what fraction of body1 is blocked by body2 at each surface point.
-
-    Args:
-        body1_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body1 (e.g. Sun)
-        body2_disk_props (list of list): List of [azimuth, elevation, angular radius] for each surface point for body2 (e.g. Jupiter)
-
-    Returns:
-        list of float: List of blocked fractions (0 to 1) for each surface point, 0 means body1 not blocked at all
-    """
-    # +Z = outward surface normal (straight up from the surface)
-    # +X = points toward the body's north pole (projected onto the local horizon plane)
-    # +Y = completes the right-hand system (so roughly "east")
-
-    # The disk properties are given as azimuth, elevation and angular radius for each surface point.
-    # When we convert these to normalized cartesian coordinates the conversion can be thought of as follows:
-    # The XYZ coordinates of the body center as seen from the where you are standing on the surface with XYZ defined as above. 
-
-    blocked_fractions = []
-    
-    for body1_props, body2_props in zip(body1_disk_props, body2_disk_props):
-        # Zip iterates both body1 and body2 properties together, so we get the properties for the same surface point at the same time.
-        # Extract azimuth, elevation and angular radius for both bodies
-        body1_az, body1_el, body1_ang_rad = body1_props
-        body2_az, body2_el, body2_ang_rad = body2_props
-        
-        # Convert azimuth and elevation to Cartesian coordinates
-        body1_x = math.cos(body1_el) * math.cos(body1_az)
-        body1_y = math.cos(body1_el) * math.sin(body1_az)
-        body1_z = math.sin(body1_el)
-        
-        body2_x = math.cos(body2_el) * math.cos(body2_az)
-        body2_y = math.cos(body2_el) * math.sin(body2_az)
-        body2_z = math.sin(body2_el)
-        
-        # Calculate angular separation between body1 and body2
-        # The dot product of the two unit vectors gives the cosine of the angle between them, so we can use arccos to get the angle.
-        # We also clip the dot product to the range [-1, 1] to avoid numerical issues with arccos that could arise due to for example floating point errors.
-        dot_product = body1_x * body2_x + body1_y * body2_y + body1_z * body2_z
-        ang_sep = math.acos(np.clip(dot_product, -1.0, 1.0))
-        
-        # Calculate blocked fraction
-        blocked = disk_overlap_fraction(body1_ang_rad, body2_ang_rad, ang_sep)
-        blocked_fractions.append(blocked)
-    
-    return blocked_fractions
-def get_disk_properties_radial(observer, body, et, srf_points):
-    """
-    Returns the azimuth, elevation and angular size of the body as seen from the surface points.
-
-    Args:
-        observer (str): Name of the body surface points are on (e.g. "Europa")
-        body (str): Name of the body to calculate disk properties for (e.g. "Jupiter")
-        et (float): Ephemeris time for which to calculate disk properties
-        srf_points (np.ndarray): Array of surface points in km, shape (resolution^2, 3)
-
-    Returns:
-        list of list: List of [azimuth, elevation, angular radius] for each surface point
-    """
-    # The azimuth is the angle between the projection onto the
-    # local topocentric principal (X-Y) plane of the vector
-    # from the observer's position to the target and the
-    # principal axis of the reference frame. The azimuth is
-    # zero on the +X axis.
-
-    # The elevation is the angle between the vector from the
-    # observer's position to the target and the local
-    # topocentric principal plane. The elevation is zero on
-    # the plane.
-
-    # The topocentric principal plane is:
-    # +Z = outward surface normal (straight up from the surface)
-    # +X = points toward the body's north pole (projected onto the local horizon plane)
-    # +Y = completes the right-hand system (so roughly "east")
-
-    # This does not quite work at the poles, but these are not included in our surface point array so it should be fine.
-    
-    # This can all be done with normalized cartesian cooordinates and vectors instead since the next step
-    # get_blocked_fractions just converts straight back to normalized cartesian coordinates to calculate the angular separation, but this is simpler to understand and the performance should be fine for our purposes.
-    # It will also be easier if we eventually implement visualization of the disk positions and sizes on the sky as seen from the surface points, which could be a nice addition to the project.
-
-
-    radii = spice.bodvrd(body, "RADII", 3)[1][0] # We only need the equatorial radius for the angular size calculation, and we assume the body is a sphere for simplicity
-    disk_props = []
-
-    for point in srf_points:
-        body_local_sph_pos = spice.azlcpo("Ellipsoid", body, et, "LT+S", False, True, point, observer, "IAU_"+observer)[0] 
-        # This gives the azimuth, elevation and distance of the body as seen from the surface point.
-        # The False then True flags means that azimuth is increasing clockwise, elevation is increasing from XY plane to +Z
-
-        body_dis = body_local_sph_pos[0] # This is the distance from the point to the body center, we need this for the angular size calculation
-        body_az = body_local_sph_pos[1] # This is the azimuth of the body as seen from the point
-        body_el = body_local_sph_pos[2] # This is the elevation of the body as seen from the point
-
-        body_ang_radius = math.atan(radii/body_dis) # In radians
-        disk_props.append([body_az, body_el, body_ang_radius])
-  
-    return disk_props
 
 
 if __name__ == '__main__':
