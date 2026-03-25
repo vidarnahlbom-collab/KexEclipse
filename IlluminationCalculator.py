@@ -54,7 +54,7 @@ calculate_illumination = True     # Chooses if the illumination function is used
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 10       # Number of points in each direction for surface point array, so total number of points is resolution^2
+resolution = 20       # Number of points in each direction for surface point array, so total number of points is resolution^2
 time_frame = 500   # The time in seconds that the animation includes, back and forth
 time_step = 100     # The time in seconds that each step moves forward with
 
@@ -219,7 +219,10 @@ def get_solar_constant(body: str, et: int) -> float:
 
 
 
-def get_illum(observer: str, moment: int, srf_points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def get_illum(observer: str,
+              moment: int,
+              srf_points: np.ndarray[np.ndarray[np.float64]]
+              ) -> tuple[np.ndarray[np.bool], np.ndarray[np.float64]]:
     '''
     Calculates the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
     
@@ -249,7 +252,12 @@ def get_illum(observer: str, moment: int, srf_points: np.ndarray) -> tuple[np.nd
 
 
 
-def blocked_moment(observer: str, blockers: list[str], srf_points: np.ndarray, moment: float, iter: int) -> np.ndarray:
+def blocked_moment(observer: str,
+                   blockers: list[str],
+                   srf_points: np.ndarray[np.ndarray[np.float64]],
+                   moment: float,
+                   iter: int
+                   ) -> np.ndarray[np.float64]:
     '''
     Calculates % of sunlight hitting the surface at each surface point at a given moment.
     Takes into account eclipses and sun illumination angle.
@@ -302,7 +310,12 @@ def blocked_moment(observer: str, blockers: list[str], srf_points: np.ndarray, m
 
 
 
-def create_pos_array(resolution, body, et):
+def create_pos_array(resolution: int,
+                     body: str,
+                     et: int
+                    ) -> tuple[np.ndarray[np.ndarray[np.float64]],
+                               np.ndarray[np.float64],
+                               np.ndarray[np.float64]]:
     '''
     Creates an array of surface points facing the sun at the given time, in Cartesian coordinates in the IAU body fixed frame.
 
@@ -346,7 +359,11 @@ def create_pos_array(resolution, body, et):
 
 
 
-def get_disk_properties(observer, body, et, srf_points):
+def get_disk_properties(observer: str,
+                        body: str,
+                        et: float,
+                        srf_points: np.ndarray[np.ndarray[np.float64]]
+                        ) -> np.ndarray[np.ndarray[np.float64]]:
     '''
     Returns the coordinates and angular radius in the sky of the body as seen from every surface point.
 
@@ -379,7 +396,9 @@ def get_disk_properties(observer, body, et, srf_points):
 
 
 
-def get_blocked_fractions(body1_disk_props, body2_disk_props):
+def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
+                          body2_disk_props: np.ndarray[np.ndarray[np.float64]]
+                          ) -> np.ndarray[np.float64]:
     '''
     Returns the fraction of how blocked body2 is by body1 in every point
 
@@ -653,19 +672,23 @@ def set_axes_equal(ax):
 
 
 
-def graph_2d(longitudes, latitudes, blocked_data, body, moments, solar_constant):
+def graph_2d(longitudes: np.ndarray[np.float64],
+             latitudes: np.ndarray[np.float64],
+             blocked_data: np.ndarray[np.ndarray[np.float64]],
+             body: str,
+             moments: list[int],
+             solar_constant: float):
     '''
     Plots the 2D surface of the entire body, with illumination
 
     Args:
-        longitudes ():              -
-        latitudes ():               -
-        blocked_data ():            -
-        body (str):                 -
-        moments ():                 -
-        solar_constant (float):     -
+        longitudes (np.ndarray[np.float64]):                list of longitudes
+        latitudes (np.ndarray[np.float64]):                 list of latitudes
+        blocked_data (np.ndarray[np.ndarray[np.float64]]):  List of blocked data for the points and the moments
+        body (str):                                         The body that should be plotted
+        moments (list[int]):                                List of times which should be plotted
+        solar_constant (float):                             The solar irradiance at the body and average time
     '''
-    
     n_lat = len(latitudes)
     n_lon = len(longitudes)
     illumination = np.array((1 - blocked_data) * solar_constant)
