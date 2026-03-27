@@ -32,8 +32,8 @@ Add possibility to output illumination of a flat plane at the center of the moon
 
 """
 # Spacetime Presets:
-utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-observer, blockers = "Europa", ['Jupiter']
+#utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
+#observer, blockers = "Europa", ['Jupiter']
 
 #utc = "2026 Mar 07 06:35:33"   # Jupiter eclipsed by Io
 #observer, blockers = "Jupiter", ['Io']
@@ -41,13 +41,13 @@ observer, blockers = "Europa", ['Jupiter']
 #utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
 #observer, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
 
-#utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
-#observer, blockers = "Jupiter", ['Io', 'Callisto']
+utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
+observer, blockers = "Jupiter", ['Io', 'Callisto']
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Slider"
-presentation = "Surface"
+mode = "Animation"
+presentation = "Dots"
 
 # Flags:
 point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
@@ -55,7 +55,7 @@ calculate_illumination = True     # Chooses if the illumination function is used
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 50       # Number of points in each direction for surface point array, so total number of points is resolution^2
+resolution = 100      # Number of points in each direction for surface point array, so total number of points is resolution^2
 time_frame = 150   # The time in seconds that the animation includes, back and forth
 time_step = 100     # The time in seconds that each step moves forward with
 
@@ -64,11 +64,11 @@ lat_deg = 0
 lon_deg = 0
 
 # Surface point map adjusts:
-lat_offset = 2*np.pi/360*(0) # Default 0 (double shadow 1.2)
-lon_offset = 2*np.pi/360*(0) # Default 0 (double shadow 7)
-lat_portion = 1 # Default 1 (double shadow 2.5)
-lon_portion = 1 + half_moon + 0 # Default 1 + half_moon (double shadow +40)
-adjust = 3 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
+lat_offset = 2*np.pi/360*(1.2) # Default 0 (double shadow 1.2)
+lon_offset = 2*np.pi/360*(7) # Default 0 (double shadow 7)
+lat_portion = 2.5 # Default 1 (double shadow 2.5)
+lon_portion = 1 + half_moon + 40 # Default 1 + half_moon (double shadow +40)
+adjust = 1 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
 # OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
 
 
@@ -172,7 +172,7 @@ def select_bodies() -> tuple[str, list[str]]:
     return observer, blockers
 
 
-# unused at the moment
+
 def select_mode() -> str:
     '''
     Asks the user how they wish to display the result (Still, Slider or Animation)
@@ -437,7 +437,7 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
            partial_overlap)))
 
 
-# All AI basically
+
 def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          srf_points: np.ndarray[np.ndarray[np.float64]],
                          observer: str,
@@ -461,6 +461,41 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         longitudes (np.ndarray):    Array of longitudes.
         latitudes (np.ndarray):     Array of latitudes.
     '''
+    def blocked_to_facecolors(blocked_idx):
+        # Handle "Still" vs "Sequence" data
+        if blocked_data.ndim == 1:
+            # It's a single frame already
+            current_frame_data = blocked_data
+        else:
+            # It's a sequence of frames
+            current_frame_data = blocked_data[blocked_idx]
+
+        # Reshape to (n_lat, n_lon)
+        vals = current_frame_data.reshape(len(latitudes), len(longitudes))
+        brightness = 1 - vals
+        
+        # Calculate face centers (averaging 4 corners)
+        fc = (brightness[:-1, :-1] + brightness[1:, :-1] +
+              brightness[:-1, 1:] + brightness[1:, 1:]) / 4
+        
+        # Create RGBA: Shape ((lat-1)*(lon-1), 4)
+        # Note: We flatten it to a long list of colors
+        return np.column_stack([fc.ravel(), fc.ravel(), fc.ravel(), np.ones(fc.size)])
+
+    def make_title(moment):
+        return f"Sun Blocked Fraction on {observer}\nBlockers: {blocker_str}\nUTC: {spice.et2utc(moment, 'C', 3)}"
+    
+    def update(frame):
+        idx = int(frame)
+        # 1. Update colors (Optimized: uses flattened array)
+        surf.set_facecolor(all_facecolors[idx])
+        # 2. Update title
+        title.set_text(make_title(moments[idx]))
+        # 3. Force draw (draw_idle is better for interactivity)
+        fig.canvas.draw_idle()
+        return surf, title
+
+    # create the surface:
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
@@ -476,9 +511,8 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     Xs = r * np.cos(u) * np.sin(v)
     Ys = r * np.sin(u) * np.sin(v)
     Zs = r * np.cos(v)
-        
-    blocker_str = ', '.join(blockers)
 
+    # Initialize figure
     fig = plt.figure(figsize=(12, 9))
     ax = fig.add_axes([0.0, 0.0, 0.78, 1.0], projection='3d')
 
@@ -486,6 +520,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     ax.set_ylabel('Y (km)')
     ax.set_zlabel('Z (km)')
 
+    # Add colorbar
     cbar_ax = fig.add_axes([0.82, 0.15, 0.1, 0.55])
     gradient = np.linspace(0, 1, 256).reshape(256, 1)
     cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
@@ -494,57 +529,45 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     cbar_ax.set_yticklabels(['0', f'{solar_constant:.1f}'])
     cbar_ax.set_ylabel('Illumination (W/m²)')
 
-    def blocked_to_facecolors(blocked):
-        vals = blocked.reshape(lon_grid.shape)  # reshape flat array back to grid
-        brightness = 1 - vals
-        fc = (brightness[:-1, :-1] + brightness[1:, :-1] +
-            brightness[:-1, 1:] + brightness[1:, 1:]) / 4
-        return np.dstack([fc, fc, fc, np.ones_like(fc)])
+    # Data for title creating later
+    blocker_str = ', '.join(blockers)
 
-    def make_title(moment):
-        return f"Sun Blocked Fraction on {observer}\nBlockers: {blocker_str}\nUTC: {spice.et2utc(moment, 'C', 3)}"
+    # Calculate all facecolors:
+    initial_facecolor = blocked_to_facecolors(0).reshape(len(latitudes)-1, len(longitudes)-1, 4)# FOR SOME REASON THIS IS A DIFFERENT SHAPE
+    all_facecolors = [blocked_to_facecolors(i) for i in range(len(moments))]
 
-    def make_surf(facecolors_array):
-        surf = ax.plot_surface(Xs, Ys, Zs, facecolors=facecolors_array,
-                               shade=False, edgecolor='none')
-        return surf
+    # Initial surface
+    surf = ax.plot_surface(Xs, Ys, Zs, facecolors=initial_facecolor,
+                           shade=False, edgecolor='none', linewidth=0, antialiased=False,
+                           rcount=len(latitudes), ccount=len(longitudes))
 
+    # Initial title
     title = fig.text(0.83, 0.92, make_title(moments[0]), 
                  fontsize=15, va='top', ha='left', 
                  wrap=True, linespacing=1.6)
 
     match mode:
-        case "Still":
-            make_surf(blocked_to_facecolors(blocked_data))
-
         case "Slider":
-            from matplotlib.widgets import Slider
-            surf = make_surf(blocked_to_facecolors(blocked_data[0]))
-
+            # Add slider
             plt.subplots_adjust(bottom=0.25)
             slider_ax = plt.axes([0.82, 0.08, 0.14, 0.03])
-            slider = Slider(slider_ax, "Time step", 0, len(blocked_data)-1, valinit=0, valstep=1)
+            slider = Slider(slider_ax, "Time", 0, len(moments)-1, valinit=0, valstep=1)
 
-            def update_slider(val):
-                idx = int(slider.val)
-                face_colors = blocked_to_facecolors(blocked_data[idx]).reshape(-1, 4)
-                surf.set_facecolor(face_colors)
-                title.set_text(make_title(moments[idx]))
-                fig.canvas.draw_idle()
-
-            slider.on_changed(update_slider)
+            # Capture slider object to prevent garbage collection
+            def slider_update(val):
+                update(val)
+            slider.on_changed(slider_update)
+            # Attach to fig to keep reference alive
+            fig.slider = slider
 
         case "Animation":
-            surf = make_surf(blocked_to_facecolors(blocked_data[0]))
-
-            def update_animation(frame):
-                face_colors = blocked_to_facecolors(blocked_data[frame]).reshape(-1, 4)
-                surf.set_facecolor(face_colors)
-                title.set_text(make_title(moments[frame]))
-                return surf,
-
-            ani = FuncAnimation(fig, update_animation, frames=len(blocked_data), interval=100, blit=False)
-
+            # blit=False is mandatory for 3D rotation to work while animating
+            ani = FuncAnimation(fig, update, frames=len(moments), 
+                            interval=50, blit=False, repeat=True)
+            # Attach to fig to keep reference alive
+            fig.ani = ani
+                    
+        
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
     z_limits = ax.get_zlim3d()
@@ -554,8 +577,6 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     z_range = abs(z_limits[1] - z_limits[0])
 
     ax.set_box_aspect([x_range, y_range, z_range])
-    #fig.tight_layout(rect=[0.0, 0.0, 1.5, 1.0])
-    #fig.tight_layout(rect=[-0.5, -0.5, 2, 2])
 
     plt.show()
 
@@ -592,16 +613,6 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     ax.set_xlabel('X (km)')
     ax.set_ylabel('Y (km)')
     ax.set_zlabel('Z (km)')
-
-    # Transparent reference sphere
-    # obs_rad = spice.bodvrd(observer, "RADII", 3)[1][0] * 0.99
-    # u, v = np.mgrid[0:2*np.pi:100j, 0:np.pi:50j]
-    # ax.plot_surface(
-    #     obs_rad * np.cos(u) * np.sin(v),
-    #     obs_rad * np.sin(u) * np.sin(v),
-    #     obs_rad * np.cos(v),
-    #     color='gray', alpha=0.1
-    # )
 
     cbar_ax = fig.add_axes([0.82, 0.15, 0.1, 0.55])  # [left, bottom, width, height]
     gradient = np.linspace(0, 1, 256).reshape(256, 1)
