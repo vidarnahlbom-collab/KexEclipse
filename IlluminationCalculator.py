@@ -12,23 +12,16 @@ from matplotlib.animation import FuncAnimation
 # KEX L5
 
 """ 
--- Add specific observer angles/perspectives DONE
+-- Sub observer based projection (half sphere from observers perspective). 
+2D should be able to export this  
+
+
+
+-- Add specific observer angles/perspectives
 So as seen from earth, at snap shot times, like JPL horizon systems 
 Compare the ang sep output of JPL to how we see the shadows at the same time (adjusted for LT) and same observer location, use earth for easy positions. 
 
--- 2D graf of longitudes and latitudes on X and Y, DONE
-
--- Added numerical output per point in graf and in data terminal DONE
-
--- Add Solar constant DONE 
-
--- Graph plot of illumination at specific location over time (interpolated function). DONE
-
--- Consider meshgrid to limit see through DONE
-
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
-
-// Add texture map to planetoids.  
 
 """
 # Spacetime Presets:
@@ -46,28 +39,28 @@ observer, blockers = "Jupiter", ['Io', 'Callisto']
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Animation"
-presentation = "Dots"
+mode = "Slider"
+presentation = "Surface"
 
 # Flags:
-point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
+point = True               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
 calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
 resolution = 100      # Number of points in each direction for surface point array, so total number of points is resolution^2
-time_frame = 150   # The time in seconds that the animation includes, back and forth
-time_step = 100     # The time in seconds that each step moves forward with
+time_frame = 10000   # The time in seconds that the animation includes, back and forth
+time_step = 50     # The time in seconds that each step moves forward with
 
 # Coordinates for Point tracking mode
-lat_deg = 0
-lon_deg = 0
+lat_deg = 0.04
+lon_deg = 27.42
 
 # Surface point map adjusts:
-lat_offset = 2*np.pi/360*(1.2) # Default 0 (double shadow 1.2)
-lon_offset = 2*np.pi/360*(7) # Default 0 (double shadow 7)
-lat_portion = 2.5 # Default 1 (double shadow 2.5)
-lon_portion = 1 + half_moon + 40 # Default 1 + half_moon (double shadow +40)
+lat_offset = 2*np.pi/360*(0) # Default 0 (double shadow 1.2)
+lon_offset = 2*np.pi/360*(0) # Default 0 (double shadow 7)
+lat_portion = 1 # Default 1 (double shadow 2.5)
+lon_portion = 1 + half_moon + 0 # Default 1 + half_moon (double shadow +40)
 adjust = 1 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
 # OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
 
