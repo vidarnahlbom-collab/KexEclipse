@@ -28,8 +28,9 @@ Add possibility to output illumination of a flat plane at the center of the moon
 #blockee, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
 
 #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
-blockee, blockers = "Jupiter", ['Io', 'Callisto']
+#blockee, blockers = "Jupiter", ['Io', 'Callisto']
 
+blockee, blockers = "Jupiter", []
 utc = "2021 MAY 15 00:00:00" # ~3 months before opposition (SO LARGE ANGLE BETWEEN SUB OBSERVER AND SUB SOLAR)
 
 #observer = "Sun"
