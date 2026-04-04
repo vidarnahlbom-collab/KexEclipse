@@ -15,17 +15,7 @@ from matplotlib.animation import FuncAnimation
 # NEITHER IS LIMB DARKENING TAKEN INTO ACCOUNT.
 
 """ 
--- Sub observer based projection (half sphere from observers perspective). 
-2D should be able to export this  
-
-
-
--- Add specific observer angles/perspectives
-So as seen from earth, at snap shot times, like JPL horizon systems 
-Compare the ang sep output of JPL to how we see the shadows at the same time (adjusted for LT) and same observer location, use earth for easy positions. 
-
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
-
 """
 # Spacetime Presets:
 #utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
