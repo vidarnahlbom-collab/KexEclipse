@@ -17,6 +17,7 @@ from matplotlib.animation import FuncAnimation
 """ 
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
 """
+
 # Spacetime Presets:
 #utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
 #blockee, blockers = "Europa", ['Jupiter']
@@ -35,7 +36,7 @@ Add possibility to output illumination of a flat plane at the center of the moon
 #utc = "2021 MAY 15 00:00:00" # ~3 months before opposition (SO LARGE ANGLE BETWEEN SUB OBSERVER AND SUB SOLAR)
 
 # Callisto Eval times:
-blockee, blockers = "Callisto", ['Jupiter']
+#blockee, blockers = "Callisto", ['Jupiter']
 
 #utc = "2025-11-12 08:08:26" # Start 1
 #utc = "2025-11-12 09:42:39" # Start 2
@@ -45,16 +46,19 @@ blockee, blockers = "Callisto", ['Jupiter']
 #utc = "2025-11-12 08:44:58" # Stop 1
 #utc = "2025-11-12 10:19:08" # Stop 2
 #utc = "2025-11-12 19:43:06" # Stop 3
-utc = "2025-11-12 13:05:43" # Stop 4
+#utc = "2025-11-12 13:05:43" # Stop 4
 
-#observer = "Sun"
-observer = "HST"
+blockee, blockers = "Earth", ['Moon']
+utc = "2026-08-12 17:46:00"
+
+observer = "Sun"
+#observer = "HST"
 #observer = "Earth"
 #observer = "Jupiter"
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Still"
+mode = "Slider"
 presentation = "Surface"
 
 abcorr = "LT+S"
@@ -62,12 +66,12 @@ abcorr = "LT+S"
 # Flags:
 point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
 calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
-half_moon = True     # Chooses if only half the moon should be shown
+half_moon = False     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 200      # Number of points in each direction for surface point array, so total number of points is resolution^2
-time_frame = 7200   # The time in seconds that the animation includes, back and forth
-time_step = 200     # The time in seconds that each step moves forward with
+resolution = 100      # Number of points in each direction for surface point array, so total number of points is resolution^2
+time_frame = 10000   # The time in seconds that the animation includes, back and forth
+time_step = 1000     # The time in seconds that each step moves forward with
 
 # Coordinates for Point tracking mode
 lat_deg = 0.04
@@ -94,12 +98,15 @@ def main() -> None:
     #mode = select_mode()
 
     start_time = time.time()
-
-    if abcorr == "LT+S":
-        spice.spkpos 
+    
 
     et = int(spice.utc2et(utc))
     print(utc)
+
+    # if abcorr == "LT+S":
+    #     lighttime = spice.spkezr(blockee, et, "J2000", "LT", observer)[1]
+    #     et += lighttime
+
     
     # We will store the blocked fractions for every time step here, so we can use it for the animation later without having to recalculate it. 
     # This is a 2D array where each row corresponds to a time step and each column corresponds to a surface point.
@@ -219,7 +226,8 @@ def get_solar_constant(body: str, et: int) -> float:
     luminosity = 3.828e26       # solar luminosity constant (W)
 
     # get Sun–body distance at et
-    position, _ = spice.spkpos("SUN", et, "J2000", abcorr, body) # Should this have abcorr?
+    # It also has the observer as body not observer since we want the numeric values on the surface, not as seen from the observer.
+    position, _ = spice.spkpos("SUN", et, "J2000", abcorr, body) 
     distance = spice.vnorm(position) * 1000      # distance in metres
 
     # solar irradiance at that distance (W/m²)
@@ -252,8 +260,7 @@ def get_illum(blockee: str,
         # Currently most of output is not used, observer is technically sun, but in out code blockee/observer is moon.
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
         _, _, _, incdnc, _, _, lit = spice.illumf(
-            "ELLIPSOID", blockee, "Sun", moment, "IAU_"+blockee, abcorr, "Sun", srf_point # used to have "LT+S"
-        )
+            "ELLIPSOID", blockee, "Sun", moment, "IAU_"+blockee, abcorr, "Sun", srf_point)
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
 
@@ -390,7 +397,7 @@ def get_disk_properties(blockee: str,
     
     relative_positions = []
     for point in srf_points:
-        rel_pos = spice.spkcpo(body, et, "IAU_"+blockee, "OBSERVER", abcorr, point, blockee, "IAU_"+blockee)[0][:3] # used to have "LT+S
+        rel_pos = spice.spkcpo(body, et, "IAU_"+blockee, "OBSERVER", abcorr, point, blockee, "IAU_"+blockee)[0][:3]
         relative_positions.append(rel_pos)
         #body_dis = math.sqrt(body_local_xyz_pos[0]**2 + body_local_xyz_pos[1]**2 + body_local_xyz_pos[2]**2)
         #body_ang_radius = math.atan(radii/body_dis) # In radians
