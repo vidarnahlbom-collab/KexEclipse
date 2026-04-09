@@ -30,8 +30,22 @@ Add possibility to output illumination of a flat plane at the center of the moon
 #utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
 #blockee, blockers = "Jupiter", ['Io', 'Callisto']
 
-blockee, blockers = "Jupiter", []
-utc = "2021 MAY 15 00:00:00" # ~3 months before opposition (SO LARGE ANGLE BETWEEN SUB OBSERVER AND SUB SOLAR)
+# For checking observer perspective:
+#blockee, blockers = "Jupiter", []
+#utc = "2021 MAY 15 00:00:00" # ~3 months before opposition (SO LARGE ANGLE BETWEEN SUB OBSERVER AND SUB SOLAR)
+
+# Callisto Eval times:
+blockee, blockers = "Callisto", ['Jupiter']
+
+#utc = "2025-11-12 08:08:26" # Start 1
+#utc = "2025-11-12 09:42:39" # Start 2
+#utc = "2025-11-12 13:10:30" # Start 3
+#utc = "2025-11-12 12:55:29" # Start 4
+
+#utc = "2025-11-12 08:44:58" # Stop 1
+#utc = "2025-11-12 10:19:08" # Stop 2
+#utc = "2025-11-12 19:43:06" # Stop 3
+utc = "2025-11-12 13:05:43" # Stop 4
 
 #observer = "Sun"
 observer = "HST"
@@ -40,8 +54,10 @@ observer = "HST"
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Animation"
+mode = "Still"
 presentation = "Surface"
+
+abcorr = "LT+S"
 
 # Flags:
 point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
@@ -49,9 +65,9 @@ calculate_illumination = True     # Chooses if the illumination function is used
 half_moon = True     # Chooses if only half the moon should be shown
 
 # Simulation Fidelity:
-resolution = 50      # Number of points in each direction for surface point array, so total number of points is resolution^2
-time_frame = 250   # The time in seconds that the animation includes, back and forth
-time_step = 50     # The time in seconds that each step moves forward with
+resolution = 200      # Number of points in each direction for surface point array, so total number of points is resolution^2
+time_frame = 7200   # The time in seconds that the animation includes, back and forth
+time_step = 200     # The time in seconds that each step moves forward with
 
 # Coordinates for Point tracking mode
 lat_deg = 0.04
@@ -79,6 +95,9 @@ def main() -> None:
 
     start_time = time.time()
 
+    if abcorr == "LT+S":
+        spice.spkpos 
+
     et = int(spice.utc2et(utc))
     print(utc)
     
@@ -89,7 +108,7 @@ def main() -> None:
 
     solar_constant = get_solar_constant(blockee, et)
 
-    start_lonlat = spice.reclat(spice.subpnt("NEAR POINT/ELLIPSOID", blockee, et, "IAU_" + blockee, "NONE", observer)[0])[1:]
+    start_lonlat = spice.reclat(spice.subpnt("NEAR POINT/ELLIPSOID", blockee, et, "IAU_" + blockee, abcorr, observer)[0])[1:] # Should this have abcoor?
 
     if point:
         srf_points = np.array(spice.latsrf("ellipsoid", blockee, et, "IAU_" + blockee, [[np.radians(lon_deg),np.radians(lat_deg)]]))
@@ -200,7 +219,7 @@ def get_solar_constant(body: str, et: int) -> float:
     luminosity = 3.828e26       # solar luminosity constant (W)
 
     # get Sun–body distance at et
-    position, _ = spice.spkpos("SUN", et, "J2000", "NONE", body)
+    position, _ = spice.spkpos("SUN", et, "J2000", abcorr, body) # Should this have abcorr?
     distance = spice.vnorm(position) * 1000      # distance in metres
 
     # solar irradiance at that distance (W/m²)
@@ -233,7 +252,7 @@ def get_illum(blockee: str,
         # Currently most of output is not used, observer is technically sun, but in out code blockee/observer is moon.
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
         _, _, _, incdnc, _, _, lit = spice.illumf(
-            "ELLIPSOID", blockee, "Sun", moment, "IAU_"+blockee, "NONE", "Sun", srf_point # used to have "LT+S"
+            "ELLIPSOID", blockee, "Sun", moment, "IAU_"+blockee, abcorr, "Sun", srf_point # used to have "LT+S"
         )
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
@@ -371,7 +390,7 @@ def get_disk_properties(blockee: str,
     
     relative_positions = []
     for point in srf_points:
-        rel_pos = spice.spkcpo(body, et, "IAU_"+blockee, "OBSERVER", "NONE", point, blockee, "IAU_"+blockee)[0][:3] # used to have "LT+S
+        rel_pos = spice.spkcpo(body, et, "IAU_"+blockee, "OBSERVER", abcorr, point, blockee, "IAU_"+blockee)[0][:3] # used to have "LT+S
         relative_positions.append(rel_pos)
         #body_dis = math.sqrt(body_local_xyz_pos[0]**2 + body_local_xyz_pos[1]**2 + body_local_xyz_pos[2]**2)
         #body_ang_radius = math.atan(radii/body_dis) # In radians
