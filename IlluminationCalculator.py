@@ -26,9 +26,13 @@ from matplotlib.animation import FuncAnimation
 
 # endregion 
 
-""" 
-Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
-"""
+# region forced global inits
+BLOCKEE = ""
+BLOCKERS = []
+OBSERVER = ""
+MODE = ""
+PRESENTATION = ""
+# endregion
 
 # region Spacetime Presets:
 # Europa eclipsed by Jupiter
@@ -46,7 +50,7 @@ Add possibility to output illumination of a flat plane at the center of the moon
 
 # region Evaluation times:
 # Callisto Eval times:
-BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
+#BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
 
 #UTC = "2025-11-12 08:08:26" # Start 1
 #UTC = "2025-11-12 09:42:39" # Start 2
@@ -64,7 +68,7 @@ UTC = "2025-11-12 13:29:30" # Start 3 EDITED
 #OBSERVER = "Callisto"
 #OBSERVER = "Moon"
 #OBSERVER = "HST"
-OBSERVER = "Earth"
+#OBSERVER = "Earth"
 #OBSERVER = "Jupiter"
 # endregion
 
@@ -77,7 +81,6 @@ PRESENTATION = "2D"
 POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
 CALCULATE_ILLUMINATION = False     # Chooses if the illumination function is used; bettcer lighting but slower
 HALF_MOON = True     # Chooses if only half the moon should be shown
-
 
 #Simulation Fidelity:
 RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
@@ -100,15 +103,12 @@ LON_PORTION = 1 + HALF_MOON + 0 # Default 1 + half_moon (double shadow +40) Valu
 ABCORR = "LT+S"
 # endregion
 
+
 def main() -> None:
     '''
     Main function defining program flow
     '''
     furnish_kernels()
-
-    #BLOCKEE, BLOCKERS = select_bodies()
-    
-    #MODE = select_mode()
 
     start_time = time.time()
     
@@ -131,7 +131,7 @@ def main() -> None:
         srf_points, longitudes, latitudes = create_pos_array(et, start_lonlat) 
     
     if (MODE == "Still" and not POINT):
-        blocking_total = blocking_moment(srf_points, et, 1)
+        blocking_total = blocking_moment(srf_points, et)
         moments.append(et)
     else:
         for i, moment in enumerate(range(et-TIME_FRAME, et+TIME_FRAME+1, TIME_STEP)):
@@ -166,13 +166,14 @@ def furnish_kernels() -> None:
 
 
 
-def select_bodies() -> tuple[str, list[str]]:
+def select_bodies() -> tuple[str, list[str], str]:
     '''
     Asks the user to select blockee and obstructing bodies
 
     Returns:
         blockee (str):         The body which will be blocked
-        blockers (list[str]):   The bodies which will be used to block the blockee  
+        blockers (list[str]):   The bodies which will be used to block the blockee
+        observer (str):         The body from which the observation will be made
     '''
     bodies = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
 
@@ -195,29 +196,54 @@ def select_bodies() -> tuple[str, list[str]]:
         if all(blocker in bodies and blocker != blockee for blocker in blockers):
             break
         print("INVALID")
-    
-    return blockee, blockers
-
-
-
-def select_mode() -> str:
-    '''
-    Asks the user how they wish to display the result (Still, Slider or Animation)
-
-    Returns:
-        mode (str):     The mode that will be used to display
-    '''
-    modes = ["Still", "Slider", "Animation"]
 
     while True:
         print("")
-        print("Available mode: " + ", ".join(modes))
+        print("Available observers: " + ", ".join(bodies + ["Sun", "Earth", "Moon", "HST"]))
+        print("Or press enter for default (Earth)")
+        observer = input("Select observer: ").strip().capitalize()
+        if observer == "":
+            observer = "Earth"    # If user presses enter, default to Earth
+            break 
+        if observer in bodies + ["Sun", "Earth", "Moon", "HST"] and observer != blockee:
+            break
+        print("INVALID")
+    
+    return blockee, blockers, observer
+
+
+
+def select_mode_and_presentation() -> tuple[str, str]:
+    '''
+    Asks the user how they wish to display the result (Still, Slider or Animation)
+    and 2D, Dots or Surface
+
+    Returns:
+        mode (str):             The mode that will be used to display
+        presentation (str):     The presentation that will be used to display
+    '''
+    modes = ["Still", "Slider", "Animation"]
+    presentations = ["2d", "Dots", "Surface"]
+
+    while True:
+        print("")
+        print("Available modes: " + ", ".join(modes))
         mode = input("Select mode: ").strip().capitalize()
         if mode in modes:
             break
         print("INVALID")
 
-    return mode
+    while True:
+        print("")
+        print("Available presentations: 2D, Dots, Surface")
+        presentation = input("Select presentation: ").strip().capitalize()
+        if presentation in presentations:
+            if presentation == "2d":
+                presentation = "2D"
+            break
+        print("INVALID")
+
+    return mode, presentation
 
 
 
@@ -852,4 +878,8 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
 
 if __name__ == '__main__':
+    if BLOCKEE == "" or not BLOCKERS or OBSERVER == "":
+        BLOCKEE, BLOCKERS, OBSERVER = select_bodies()
+    if MODE == "" or PRESENTATION == "":
+        MODE, PRESENTATION = select_mode_and_presentation()
     main()
