@@ -11,81 +11,94 @@ from matplotlib.animation import FuncAnimation
 # 2026-03-05
 # KEX L5
 
-# WE DO NOT CALCULATE WHAT PART OF THE SUN IS BLOCKED. 
-# NEITHER IS LIMB DARKENING TAKEN INTO ACCOUNT.
+# region Current erors:
+# Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
+
+# Does not take into account limb darkening
+
+# Surface points are only calculated once, so if observer perspective shifts alot during time frame,
+# the points seen at the ends of the time frame are not accurate. 
+# In essence, only the middle frame is accurate. 
+
+# Subobserver longitude and latitude division is not correct. 
+# If the observer is far from the ecliptic plane, the half of the object facing the observer is not correctly modeled.
+# Essentially visualisation work best for observers near the ecliptic plane.
+
+# endregion 
 
 """ 
 Add possibility to output illumination of a flat plane at the center of the moon, always with normal facing sun. (with extended atmosphere)  
 """
 
-# Spacetime Presets:
-#utc = "2021 Apr 25 15:26:31"    # Europa eclipsed by Jupiter
-#blockee, blockers = "Europa", ['Jupiter']
+# region Spacetime Presets:
+# Europa eclipsed by Jupiter
+#UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 15:26:31", "Europa", ['Jupiter']   
 
-#utc = "2026 Mar 07 06:35:33"   # Jupiter eclipsed by Io
-#blockee, blockers = "Jupiter", ['Io']
+# Jupiter eclipsed by Io
+#UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 06:35:33", "Jupiter", ['Io'] 
 
-#utc = "2015 Jan 24 06:09:19"   # Triple shadow transit
-#blockee, blockers = "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter']
+# Triple shadow transit
+#UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
 
-#utc = "2015 Jan 24 05:16:22"   # Two shadow transits in the same spot on Jupiter with Io and Callisto
-#blockee, blockers = "Jupiter", ['Io', 'Callisto']
+# Two shadow transits in the same spot on Jupiter with Io and Callisto
+UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
+# endregion
 
-# For checking observer perspective:
-#blockee, blockers = "Jupiter", []
-#utc = "2021 MAY 15 00:00:00" # ~3 months before opposition (SO LARGE ANGLE BETWEEN SUB OBSERVER AND SUB SOLAR)
-
+# region Evaluation times:
 # Callisto Eval times:
-#blockee, blockers = "Callisto", ['Jupiter']
+#BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
 
-#utc = "2025-11-12 08:08:26" # Start 1
-#utc = "2025-11-12 09:42:39" # Start 2
-#utc = "2025-11-12 13:10:30" # Start 3
-#utc = "2025-11-12 12:55:29" # Start 4
+#UTC = "2025-11-12 08:08:26" # Start 1
+#UTC = "2025-11-12 09:42:39" # Start 2
+#UTC = "2025-11-12 13:10:30" # Start 3
+#UTC = "2025-11-12 12:55:29" # Start 4
 
-#utc = "2025-11-12 08:44:58" # Stop 1
-#utc = "2025-11-12 10:19:08" # Stop 2
-#utc = "2025-11-12 19:43:06" # Stop 3
-#utc = "2025-11-12 13:05:43" # Stop 4
+#UTC = "2025-11-12 08:44:58" # Stop 1
+#UTC = "2025-11-12 10:19:08" # Stop 2
+#UTC = "2025-11-12 19:43:06" # Stop 3
+#UTC = "2025-11-12 13:05:43" # Stop 4
+# endregion
 
-blockee, blockers = "Earth", ['Moon']
-utc = "2026-08-12 17:46:00"
-
-observer = "Sun"
-#observer = "HST"
-#observer = "Earth"
-#observer = "Jupiter"
+# region Observers:
+OBSERVER = "Sun"
+#OBSERVER = "Callisto"
+#OBSERVER = "Moon"
+#OBSERVER = "HST"
+#OBSERVER = "Earth"
+#OBSERVER = "Jupiter"
+# endregion
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
-mode = "Slider"
-presentation = "Surface"
-
-abcorr = "LT+S"
+MODE = "Slider"
+PRESENTATION = "Surface"
 
 # Flags:
-point = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
-calculate_illumination = True     # Chooses if the illumination function is used; bettcer lighting but slower
-half_moon = False     # Chooses if only half the moon should be shown
-
-# Simulation Fidelity:
-resolution = 100      # Number of points in each direction for surface point array, so total number of points is resolution^2
-time_frame = 10000   # The time in seconds that the animation includes, back and forth
-time_step = 1000     # The time in seconds that each step moves forward with
-
-# Coordinates for Point tracking mode
-lat_deg = 0.04
-lon_deg = 27.42
-
-# Surface point map adjusts:
-lat_offset = 2*np.pi/360*(0) # Default 0 (double shadow 1.2)
-lon_offset = 2*np.pi/360*(0) # Default 0 (double shadow 7)
-lat_portion = 1 # Default 1 (double shadow 2.5)
-lon_portion = 1 + half_moon + 0 # Default 1 + half_moon (double shadow +40)
-adjust = 1 # Adjusts the distribution of longitude and latitude lines for jupiter, Default 3
-# OBS HERE WE CAN LATER ALSO ADD STUFF LIKE SUB OBSERVER FOR VIEWING FROM EARTH OR SATELLITE
+POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
+CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
+HALF_MOON = True     # Chooses if only half the moon should be shown
 
 
+#Simulation Fidelity:
+RESOLUTION = 50      # Number of points in each direction for surface point array, so total number of points is resolution^2
+TIME_FRAME = 10000   # The time in seconds that the animation includes, back and forth
+TIME_STEP = 1000     # The time in seconds that each step moves forward with
+
+# region Coordinates for Point tracking mode
+LAT_DEG = 0.04
+LON_DEG = 27.42
+# endregion
+
+# region Surface point zone zooming and panning:
+LAT_OFFSET = np.deg2rad(1.2) # Default 0 (double shadow 1.2) [Range: -90 to 90]
+LON_OFFSET = np.deg2rad(-18) # Default 0 (double shadow -18) [Range: -180 to 180]
+LAT_PORTION = 20 # Default 1 (double shadow 20) Values>1
+LON_PORTION = 1 + HALF_MOON + 40 # Default 1 + half_moon (double shadow +40) Values>1
+# endregion
+
+# region Other options:
+ABCORR = "LT+S"
+# endregion
 
 def main() -> None:
     '''
@@ -93,54 +106,48 @@ def main() -> None:
     '''
     furnish_kernels()
 
-    #blockee, blockers = select_bodies()
+    #BLOCKEE, BLOCKERS = select_bodies()
     
-    #mode = select_mode()
+    #MODE = select_mode()
 
     start_time = time.time()
     
+    et = int(spice.utc2et(UTC))
+    print(UTC)
 
-    et = int(spice.utc2et(utc))
-    print(utc)
-
-    # if abcorr == "LT+S":
-    #     lighttime = spice.spkezr(blockee, et, "J2000", "LT", observer)[1]
-    #     et += lighttime
-
-    
     # We will store the blocked fractions for every time step here, so we can use it for the animation later without having to recalculate it. 
     # This is a 2D array where each row corresponds to a time step and each column corresponds to a surface point.
-    blocked_total = np.array([]) 
+    blocking_total = np.array([]) 
     moments = []
 
-    solar_constant = get_solar_constant(blockee, et)
+    solar_constant = get_solar_constant(et)
 
-    start_lonlat = spice.reclat(spice.subpnt("NEAR POINT/ELLIPSOID", blockee, et, "IAU_" + blockee, abcorr, observer)[0])[1:] # Should this have abcoor?
-
-    if point:
-        srf_points = np.array(spice.latsrf("ellipsoid", blockee, et, "IAU_" + blockee, [[np.radians(lon_deg),np.radians(lat_deg)]]))
+    if POINT:
+        srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et, "IAU_" + BLOCKEE, [[np.deg2rad(LON_DEG),np.deg2rad(LAT_DEG)]]))
     else:
-        srf_points, longitudes, latitudes = create_pos_array(resolution, blockee, et, start_lonlat) 
+        start_lonlat = spice.reclat(spice.subpnt("NEAR POINT/ELLIPSOID", BLOCKEE, et, "IAU_" + BLOCKEE, ABCORR, OBSERVER)[0])[1:]
+        srf_points, longitudes, latitudes = create_pos_array(et, start_lonlat) 
     
-    if (mode == "Still" and not point):
-        blocked_total = blocked_moment(blockee, blockers, srf_points, et, 1)
+    if (MODE == "Still" and not POINT):
+        blocking_total = blocking_moment(srf_points, et, 1)
         moments.append(et)
     else:
-        for i, moment in enumerate(range(et-time_frame, et+time_frame+1, time_step)):
-            blocked_at_moment = blocked_moment(blockee, blockers, srf_points, moment, i+1)
-            blocked_total = np.vstack([blocked_total, blocked_at_moment]) if blocked_total.size else blocked_at_moment
+        for i, moment in enumerate(range(et-TIME_FRAME, et+TIME_FRAME+1, TIME_STEP)):
+            print(f"Calculating moment {i+1}/{(2*TIME_FRAME)//TIME_STEP+1}...")
+            blocking_at_moment = blocking_moment(srf_points, moment)
+            blocking_total = np.vstack([blocking_total, blocking_at_moment]) if blocking_total.size else blocking_at_moment
             moments.append(moment)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
     
-    if point:
-        graph_point(lon_deg, lat_deg, blocked_total, blockee, moments, solar_constant)
-    elif presentation == "2D":
-        graph_2d(longitudes, latitudes, blocked_total, blockee, moments, solar_constant)
-    elif presentation == "Dots":
-        visualize_3D_dots(blocked_total, srf_points, blockee, blockers, moments, mode, solar_constant, start_lonlat)
-    elif presentation == "Surface":
-        visualize_3D_surface(blocked_total, srf_points, blockee, blockers, moments, mode, solar_constant, longitudes, latitudes, start_lonlat)
+    if POINT:
+        graph_point(blocking_total, moments, solar_constant)
+    elif PRESENTATION == "2D":
+        graph_2d(longitudes, latitudes, blocking_total, moments, solar_constant)
+    elif PRESENTATION == "Dots":
+        visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat)
+    elif PRESENTATION == "Surface":
+        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
 
 
 
@@ -212,12 +219,12 @@ def select_mode() -> str:
 
 
 
-def get_solar_constant(body: str, et: int) -> float:
+def get_solar_constant(et: int) -> float:
     '''
-    Calculates the solar irradiance at body position of selected time et
+    Calculates the solar irradiance at BLOCKEE position of selected time et
+    DEPENDS ON GLOBALS BLOCKEE, ABCORR
 
     Args:
-        body (str):     The body that will be observed
         et (int):       The (ephemeris) time at which the calculation should be made
     
     Returns:
@@ -226,8 +233,8 @@ def get_solar_constant(body: str, et: int) -> float:
     luminosity = 3.828e26       # solar luminosity constant (W)
 
     # get Sun–body distance at et
-    # It also has the observer as body not observer since we want the numeric values on the surface, not as seen from the observer.
-    position, _ = spice.spkpos("SUN", et, "J2000", abcorr, body) 
+    # It also has the sun as observer not OBSERVER since we want the numeric values on the surface, not as seen from the observer.
+    position, _ = spice.spkpos("SUN", et, "J2000", ABCORR, BLOCKEE) 
     distance = spice.vnorm(position) * 1000      # distance in metres
 
     # solar irradiance at that distance (W/m²)
@@ -236,15 +243,14 @@ def get_solar_constant(body: str, et: int) -> float:
 
 
 
-def get_illum(blockee: str,
-              moment: int,
+def get_illum(moment: int,
               srf_points: np.ndarray[np.ndarray[np.float64]]
               ) -> tuple[np.ndarray[np.bool], np.ndarray[np.float64]]:
     '''
-    Calculates the illumination data for each surface point, including if it is illuminated at all and the incidence angle.
-    
+    Calculates the illumination data for each surface point on BLOCKEE, including if it is illuminated at all and the incidence angle.
+    DEPENDS ON GLOBALS BLOCKEE, ABCORR
+
     Args:
-        blockee (str):                                     Name of the body that the surface points are on
         moment (int):                                       Ephemeris time for which to calculate illumination data
         srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
 
@@ -257,10 +263,10 @@ def get_illum(blockee: str,
     incidence_angles = []
 
     for srf_point in srf_points:
-        # Currently most of output is not used, observer is technically sun, but in out code blockee/observer is moon.
+        # Sun is observer here since we want the numeric values on the surface, not as seen from the observer.
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
         _, _, _, incdnc, _, _, lit = spice.illumf(
-            "ELLIPSOID", blockee, "Sun", moment, "IAU_"+blockee, abcorr, "Sun", srf_point)
+            "ELLIPSOID", BLOCKEE, "Sun", moment, "IAU_"+BLOCKEE, ABCORR, "Sun", srf_point)
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
 
@@ -268,30 +274,25 @@ def get_illum(blockee: str,
 
 
 
-def blocked_moment(blockee: str,
-                   blockers: list[str],
-                   srf_points: np.ndarray[np.ndarray[np.float64]],
+def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
                    moment: float,
-                   iter: int
                    ) -> np.ndarray[np.float64]:
     '''
-    Calculates % of sunlight hitting the surface at each surface point at a given moment.
-    Takes into account eclipses and sun illumination angle.
+    Calculates % of sunlight hitting the surface at each surface point on BLOCKEE at a given moment.
+    Takes into account eclipses from BLOCKERS and sun illumination angle.
+    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, CALCULATE_ILLUMINATION
 
     Args:
-        blockee (str):                                     Name of the body that the surface points are on
-        blockers (list[str]):                               Names of obstructing bodies
         srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
         moment (float):                                     Ephemeris time for which to calculate blocked fractions
-        iter (int):                                         The iteration which is calculated
 
     Returns:
-        blocked_at_moment (np.ndarray[float64]):    Array of blocked fractions (0 to 1) for each surface point
+        blocking_at_moment (np.ndarray[float64]):    Array of blocked fractions (0 to 1) for each surface point
     '''
-    blocked_at_moment = np.ones(len(srf_points)) # Default is dark/unlit 
+    blocking_at_moment = np.ones(len(srf_points)) # Default is dark/unlit, so full block, 1
 
-    if calculate_illumination:
-        lit_flags, incidence_angles = get_illum(blockee, moment, srf_points)
+    if CALCULATE_ILLUMINATION:
+        lit_flags, incidence_angles = get_illum(moment, srf_points)
         lit_mask = lit_flags.astype(bool) # True where sunlit
     else:
         lit_mask = np.ones(len(srf_points), dtype=bool) # treat all as lit
@@ -299,49 +300,46 @@ def blocked_moment(blockee: str,
     lit_points = srf_points[lit_mask] # lit_points now only containts points that are lit
 
     if len(lit_points) == 0:
-        return blocked_at_moment  # everything dark, skip all SPICE work
+        return blocking_at_moment  # everything dark, skip all SPICE work
 
     # We only get disk properties for the lit points
     # Get the disk properties of the sun and blockers as seen from the surface points.
-    sun_disk_props = get_disk_properties(blockee, "Sun", moment, lit_points)
+    sun_disk_props = get_disk_properties("Sun", moment, lit_points)
 
-    blocked_lit = np.zeros(len(lit_points))
+    blocking_of_lit_points = np.zeros(len(lit_points))
+
     # For every blocker, calculate the blocked fractions of the sun for every lit point and then combine them 
-    for blocker in blockers:
-        print(f"Calculating blocked fractions {iter} for {blocker}...")
-        blocker_disk_props = get_disk_properties(blockee, blocker, moment, lit_points)
-        blocked = get_blocked_fractions(sun_disk_props, blocker_disk_props)
-        blocked_lit = np.clip(blocked_lit + blocked, 0.0, 1.0) 
+    for blocker in BLOCKERS:
+        blocker_disk_props = get_disk_properties(blocker, moment, lit_points)
+        blocking = get_blocked_fractions(sun_disk_props, blocker_disk_props)
+        blocking_of_lit_points = np.clip(blocking_of_lit_points + blocking, 0.0, 1.0) 
         # CURRENTLY ADDITATIVE.
         # WE DO NOT CALCULATE WHAT PART OF THE SUN IS BLOCKED. 
         # NEITHER IS LIMB DARKENING TAKEN INTO ACCOUNT.
 
-    if calculate_illumination:
+    if CALCULATE_ILLUMINATION:
         # Apply cosine shading only to lit points
         cos_angles = np.cos(incidence_angles[lit_mask])
-        blocked_lit = 1 - cos_angles * (1 - blocked_lit)
+        blocking_of_lit_points = 1 - cos_angles * (1 - blocking_of_lit_points)
 
-    # blocked at moment starts unlit, but for every point where lit_mask is true (so point is lit)
+    # blocking at moment starts unlit, but for every point where lit_mask is true (so point is lit)
     # we change the value to the calculated illumination.
-    blocked_at_moment[lit_mask] = blocked_lit 
+    blocking_at_moment[lit_mask] = blocking_of_lit_points
 
-    return blocked_at_moment
+    return blocking_at_moment
 
 
 
-def create_pos_array(resolution: int,
-                     body: str,
-                     et: int,
+def create_pos_array(et: int,
                      start_lonlat: tuple[float, float]
                     ) -> tuple[np.ndarray[np.ndarray[np.float64]],
                                np.ndarray[np.float64],
                                np.ndarray[np.float64]]:
     '''
     Creates an array of surface points facing the sun at the given time, in Cartesian coordinates in the IAU body fixed frame.
+    Depends on globals BLOCKEE and RESOLUTION
 
-    Args:
-        resolution (int):   Number of points in each direction for surface point array, total number of points is resolution^2
-        body (str):         Name of the body to calculate surface points for
+    Args:    
         et (float):         Ephemeris time for which to calculate surface points
 
     Returns:
@@ -351,16 +349,17 @@ def create_pos_array(resolution: int,
     '''
     # Longitudes: only the longitudes of the half of the planetoid facing the sun
     # Latitudes: This time only -Pi/2 to Pi/2 since we go from south to north pole. 
-    # We also ignore south and north pole as if they are included they will be included resolution times, one for every longitude.
-    # Additonally, if the the body is Jupiter, we only calculate a small band around the equator where transit shadows can occur
-    # And we redistribute the surface points. 
-    
-    #if body == "Jupiter":
-    #    latitudes = np.linspace(start_lonlat[1]+lat_offset-np.pi/(20*lat_portion), start_lonlat[1]+lat_offset+np.pi/(20*lat_portion), int(float(resolution)/adjust), endpoint=True)#[1:]
-    #    longitudes = np.linspace(start_lonlat[0]+lon_offset-np.pi/lon_portion, start_lonlat[0]+lon_offset+np.pi/lon_portion, resolution*adjust, endpoint=True)
-    #else:
-    latitudes = np.linspace(start_lonlat[1]+lat_offset-np.pi/(2*lat_portion), start_lonlat[1]+lat_offset+np.pi/(2*lat_portion), resolution, endpoint=True)#[1:]
-    longitudes = np.linspace(start_lonlat[0]+lon_offset-np.pi/lon_portion, start_lonlat[0]+lon_offset+np.pi/lon_portion, resolution, endpoint=True)
+    # Both of these can be adjusted so only a portion of the surface is seen.
+    # This portion can also be moved around with offsets, where the start position is the subobserver point.
+
+    lat_center = np.clip(start_lonlat[1] + LAT_OFFSET, -np.pi/2, np.pi/2)
+    lat_min = np.clip(lat_center - np.pi/(2*LAT_PORTION), -np.pi/2, np.pi/2)
+    lat_max = np.clip(lat_center + np.pi/(2*LAT_PORTION), -np.pi/2, np.pi/2)
+
+    sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION+2)[1:-1] # no poles
+    latitudes = np.arcsin(sin_latitudes)
+
+    longitudes = np.linspace(start_lonlat[0]+LON_OFFSET-np.pi/LON_PORTION, start_lonlat[0]+LON_OFFSET+np.pi/LON_PORTION, RESOLUTION)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
@@ -370,22 +369,21 @@ def create_pos_array(resolution: int,
     #print(lonlat)
     # Now we put this into spice.latsrf. lonlat will be parsed as planetocentric 
 
-    srf_points = np.array(spice.latsrf("ellipsoid", body, et, "IAU_" + body, lonlat))
+    srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et, "IAU_" + BLOCKEE, lonlat))
 
     return srf_points, longitudes, latitudes
 
 
 
-def get_disk_properties(blockee: str,
-                        body: str,
+def get_disk_properties(body: str,
                         et: float,
                         srf_points: np.ndarray[np.ndarray[np.float64]]
                         ) -> np.ndarray[np.ndarray[np.float64]]:
     '''
     Returns the coordinates and angular radius in the sky of the body as seen from every surface point.
+    DEPENDS ON GLOBALS BLOCKEE and ABCORR
 
     Args:
-        blockee (str):                                     Name of the body the surface points are on
         body (str):                                         Name of the body to calculate disk properties for
         et (float):                                         Ephemeris time for which to calculate disk properties
         srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
@@ -397,11 +395,8 @@ def get_disk_properties(blockee: str,
     
     relative_positions = []
     for point in srf_points:
-        rel_pos = spice.spkcpo(body, et, "IAU_"+blockee, "OBSERVER", abcorr, point, blockee, "IAU_"+blockee)[0][:3]
+        rel_pos = spice.spkcpo(body, et, "IAU_"+BLOCKEE, "OBSERVER", ABCORR, point, BLOCKEE, "IAU_"+BLOCKEE)[0][:3]
         relative_positions.append(rel_pos)
-        #body_dis = math.sqrt(body_local_xyz_pos[0]**2 + body_local_xyz_pos[1]**2 + body_local_xyz_pos[2]**2)
-        #body_ang_radius = math.atan(radii/body_dis) # In radians
-        #lcl_norm_xyz.append([body_local_xyz_pos[0]/body_dis, body_local_xyz_pos[1]/body_dis, body_local_xyz_pos[2]/body_dis, body_ang_radius])
 
     # Convert to np.arrays for optimization
     relative_positions = np.array(relative_positions)               # Shape (N,3)
@@ -459,24 +454,19 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
 
 def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          srf_points: np.ndarray[np.ndarray[np.float64]],
-                         blockee: str,
-                         blockers: list[str],
                          moments: list[float],
-                         mode: str,
                          solar_constant,
                          longitudes: np.ndarray[np.float64],
                          latitudes: np.ndarray[np.float64],
                          start_lonlat: tuple[float, float]):
     '''
     Plots part of the surface in 3D, with illumination
-
+    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, OBSERVER, MODE
+    
     Args:
         blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
         srf_points (np.ndarray):    Surface points in IAU body-fixed frame, shape (N, 3).
-        blockee (str):              Name of the body being blocked.
-        blockers (list[str]]):      Names of blocking bodies.
         moments (list[float]):      Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
-        mode (str):                 One of 'Still', 'Slider', or 'Animation'.
         solar_constant (float):     The irradiance at the body.
         longitudes (np.ndarray):    Array of longitudes.
         latitudes (np.ndarray):     Array of latitudes.
@@ -504,7 +494,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         return np.column_stack([fc.ravel(), fc.ravel(), fc.ravel(), np.ones(fc.size)])
 
     def make_title(moment):
-        return f"Illumination on {blockee}\nBlockers: {blocker_str}\nObserver: {observer}\nUTC: {spice.et2utc(moment, 'C', 3)}"
+        return f"Illumination on {BLOCKEE}\nBlockers: {blocker_str}\nObserver: {OBSERVER}\nUTC: {spice.et2utc(moment, 'C', 0)}"
     
     def update(frame):
         idx = int(frame)
@@ -551,7 +541,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     cbar_ax.set_ylabel('Illumination (W/m²)')
 
     # Data for title creating later
-    blocker_str = ', '.join(blockers)
+    blocker_str = ', '.join(BLOCKERS)
 
     # Calculate all facecolors:
     initial_facecolor = blocked_to_facecolors(0).reshape(len(latitudes)-1, len(longitudes)-1, 4)# FOR SOME REASON THIS IS A DIFFERENT SHAPE
@@ -567,7 +557,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                  fontsize=15, va='top', ha='left', 
                  wrap=True, linespacing=1.6)
 
-    match mode:
+    match MODE:
         case "Slider":
             # Add slider
             plt.subplots_adjust(bottom=0.25)
@@ -607,22 +597,17 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
 def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                       srf_points: np.ndarray[np.ndarray[np.float64]],
-                      blockee: str,
-                      blockers: list[str],
                       moments: list[float],
-                      mode: str,
                       solar_constant: float,
                       start_lonlat: tuple[float, float]):
     '''
     Visualizes solar eclipse fractions on a planetoid surface.
-
+    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, OBSERVER, MODE
+    
     Args:
         blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
         srf_points (np.ndarray):    Surface points in IAU body-fixed frame, shape (N, 3).
-        blockee (str):              Name of the body being blocked.
-        blockers (list[str]]):      Names of blocking bodies.
         moments (list[float]):      Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
-        mode (str):                 One of 'Still', 'Slider', or 'Animation'.
         solar_constant (float):     The irradiance at the body.
         start_lonlat (tuple[float, float]): The starting longitude and latitude for the view.
     '''
@@ -630,7 +615,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
 
-    blocker_str = ', '.join(blockers)
+    blocker_str = ', '.join(BLOCKERS)
 
     fig = plt.figure(figsize=(12, 9))
     ax = fig.add_axes([0.0, 0.0, 0.78, 1.0], projection='3d')
@@ -651,13 +636,13 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
         return np.column_stack([1-blocked, 1-blocked, 1-blocked])
 
     def make_title(moment):
-        return f"Illumination on {blockee}\nBlockers: {blocker_str}\n Observer: {observer}\nUTC: {spice.et2utc(moment, 'C', 3)}"
+        return f"Illumination on {BLOCKEE}\nBlockers: {blocker_str}\nObserver: {OBSERVER}\nUTC: {spice.et2utc(moment, 'C', 0)}"
 
     title = fig.text(0.83, 0.92, make_title(moments[0]), 
                  fontsize=15, va='top', ha='left', 
                  wrap=True, linespacing=1.6)
 
-    match mode:
+    match MODE:
         case "Still":
             ax.scatter(x, y, z, c=make_colors(blocked_data), s=20)            
 
@@ -715,7 +700,6 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
 def graph_2d(longitudes: np.ndarray[np.float64],
              latitudes: np.ndarray[np.float64],
              blocked_data: np.ndarray[np.ndarray[np.float64]],
-             body: str,
              moments: list[int],
              solar_constant: float):
     '''
@@ -725,7 +709,6 @@ def graph_2d(longitudes: np.ndarray[np.float64],
         longitudes (np.ndarray[np.float64]):                list of longitudes
         latitudes (np.ndarray[np.float64]):                 list of latitudes
         blocked_data (np.ndarray[np.ndarray[np.float64]]):  List of blocked data for the points and the moments
-        body (str):                                         The body that should be plotted
         moments (list[int]):                                List of times which should be plotted
         solar_constant (float):                             The solar irradiance at the body and average time
     '''
@@ -735,7 +718,7 @@ def graph_2d(longitudes: np.ndarray[np.float64],
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    match mode:
+    match MODE:
         case "Still":
             data_2d = illumination.reshape(n_lat, n_lon)
             img = ax.pcolormesh(
@@ -747,7 +730,7 @@ def graph_2d(longitudes: np.ndarray[np.float64],
             fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
             ax.set_xlabel("Longitude (°)")
             ax.set_ylabel("Latitude (°)")
-            ax.set_title(f"{body} — {spice.et2utc(moments[0], 'C', 0)}")
+            ax.set_title(f"{BLOCKEE} — {spice.et2utc(moments[0], 'C', 0)}")
 
         case "Slider":
             data_2d = illumination[0].reshape(n_lat, n_lon)
@@ -760,7 +743,7 @@ def graph_2d(longitudes: np.ndarray[np.float64],
             fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
             ax.set_xlabel("Longitude (°)")
             ax.set_ylabel("Latitude (°)")
-            title = ax.set_title(f"{body} — {spice.et2utc(moments[0], 'C', 0)}")
+            title = ax.set_title(f"{BLOCKEE} — {spice.et2utc(moments[0], 'C', 0)}")
 
             plt.subplots_adjust(bottom=0.25)
             slider_ax = plt.axes([0.2, 0.0, 0.6, 0.03])
@@ -769,7 +752,7 @@ def graph_2d(longitudes: np.ndarray[np.float64],
             def update_slider(val):
                 idx = int(slider.val)
                 img.set_array(illumination[idx].reshape(n_lat, n_lon).ravel())
-                title.set_text(f"{body} — {spice.et2utc(moments[idx], 'C', 0)}")
+                title.set_text(f"{BLOCKEE} — {spice.et2utc(moments[idx], 'C', 0)}")
                 fig.canvas.draw_idle()
 
             slider.on_changed(update_slider)
@@ -789,7 +772,7 @@ def graph_2d(longitudes: np.ndarray[np.float64],
             def update(frame):
                 data_2d = illumination[frame].reshape(n_lat, n_lon)
                 img.set_array(data_2d.ravel())
-                title.set_text(f"{body} — {spice.et2utc(moments[frame], 'C', 0)}")
+                title.set_text(f"{BLOCKEE} — {spice.et2utc(moments[frame], 'C', 0)}")
                 return img, title
 
             ani = FuncAnimation(fig, update, frames=len(moments), interval=100, blit=False)
@@ -799,20 +782,15 @@ def graph_2d(longitudes: np.ndarray[np.float64],
 
 
 
-def graph_point(lon_deg: int,
-                lat_deg: int,
-                blocked_data: np.ndarray[np.ndarray[np.float64]],
-                body: str,
+def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
                 moments: list[int],
                 solar_constant: float):
     '''
     Plots illumination over time for a single tracked surface point.
-
+    DEPENDS ON GLOBALS BLOCKEE, LON_DEG, LAT_DEG, MODE
+    
     Args:
-        lon_deg (int):                                      Longitude of point in degrees.
-        lat_deg (int):                                      Latitude of point in degrees.
         blocked_data (np.ndarray[np.ndarray[np.float64]]):  2D array of blocked fractions for every moment.
-        body (str):                                         Name of the observed body.
         moments (list[int]):                                List of ephemeris times.
         solar_constant (float):                             Maximum illumination value.
     '''
@@ -823,7 +801,7 @@ def graph_point(lon_deg: int,
     utc_times = [spice.et2utc(m, 'C', 0) for m in moments]
 
     # Print table
-    print(f"\nTracked point — Lon: {lon_deg:.2f}°  Lat: {lat_deg:.2f}°")
+    print(f"\nTracked point — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
     print(f"{'UTC':<30} {'Illumination (W/m²)':>20}")
     print("-" * 52)
     for utc, val in zip(utc_times, illumination):
@@ -850,7 +828,7 @@ def graph_point(lon_deg: int,
     ax.set_xticks(tick_indices)
     ax.set_xticklabels([utc_times[i] for i in tick_indices], rotation=30, ha='right', fontsize=8)
     ax.set_ylabel('Illumination (W/m²)')
-    ax.set_title(f"{body} — Lon: {lon_deg:.2f}°  Lat: {lat_deg:.2f}°")
+    ax.set_title(f"{BLOCKEE} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
     ax.set_facecolor('black')
     fig.patch.set_facecolor('black')
     ax.tick_params(colors='white')
