@@ -11,7 +11,7 @@ from matplotlib.animation import FuncAnimation
 # 2026-03-05
 # KEX L5
 
-# region Current erors:
+# region Current errors:
 # Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
 
 # Does not take into account limb darkening
@@ -50,11 +50,12 @@ PRESENTATION = ""
 
 # region Evaluation times:
 # Callisto Eval times:
-#BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
+BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
+UTC = "2025-11-12 13:55:33" # partial penumbral
 
 #UTC = "2025-11-12 08:08:26" # Start 1
 #UTC = "2025-11-12 09:42:39" # Start 2
-UTC = "2025-11-12 13:29:30" # Start 3 EDITED
+#UTC = "2025-11-12 13:10:30" # Start 3
 #UTC = "2025-11-12 12:55:29" # Start 4
 
 #UTC = "2025-11-12 08:44:58" # Stop 1
@@ -68,7 +69,7 @@ UTC = "2025-11-12 13:29:30" # Start 3 EDITED
 #OBSERVER = "Callisto"
 #OBSERVER = "Moon"
 #OBSERVER = "HST"
-#OBSERVER = "Earth"
+OBSERVER = "Earth"
 #OBSERVER = "Jupiter"
 # endregion
 
@@ -84,8 +85,8 @@ HALF_MOON = True     # Chooses if only half the moon should be shown
 
 #Simulation Fidelity:
 RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
-TIME_FRAME = 100   # The time in seconds that the animation includes, back and forth
-TIME_STEP = 99     # The time in seconds that each step moves forward with
+TIME_FRAME = 30 # The time in seconds that the animation includes, back and forth
+TIME_STEP = 5     # The time in seconds that each step moves forward with
 
 # region Coordinates for Point tracking mode
 LAT_DEG = 0.04
@@ -93,10 +94,10 @@ LON_DEG = 27.42
 # endregion
 
 # region Surface point zone zooming and panning:
-LAT_OFFSET = np.deg2rad(0) # Default 0 (double shadow 1.2) [Range: -90 to 90]
-LON_OFFSET = np.deg2rad(0) # Default 0 (double shadow -18) [Range: -180 to 180]
-LAT_PORTION = 1 # Default 1 (double shadow 20) Values>1
-LON_PORTION = 1 + HALF_MOON + 0 # Default 1 + half_moon (double shadow +40) Values>1
+LAT_OFFSET = np.deg2rad(-45) # Default 0 (double shadow 1.2) [Range: -90 to 90]
+LON_OFFSET = np.deg2rad(-45) # Default 0 (double shadow -18) [Range: -180 to 180]
+LAT_PORTION = 4 # Default 1 (double shadow 20) Values>1
+LON_PORTION = 1 + HALF_MOON + 2 # Default 1 + half_moon (double shadow +40) Values>1
 # endregion
 
 # region Other options:
@@ -112,7 +113,7 @@ def main() -> None:
 
     start_time = time.time()
     
-    et = int(spice.utc2et(UTC))
+    et_reception = int(spice.utc2et(UTC))
     print(UTC)
 
     # We will store the blocked fractions for every time step here, so we can use it for the animation later without having to recalculate it. 
@@ -120,25 +121,30 @@ def main() -> None:
     blocking_total = np.array([]) 
     moments = []
 
-    solar_constant = get_solar_constant(et)
+    start_rec, trgepc, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", BLOCKEE, et_reception, "IAU_" + BLOCKEE, ABCORR, OBSERVER)
+    
+    light_travel_time = et_reception - trgepc
+    et_emission = et_reception - light_travel_time  
 
+    solar_constant = get_solar_constant(et_emission)
+    
     if POINT:
-        srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et, "IAU_" + BLOCKEE, [[np.deg2rad(LON_DEG),np.deg2rad(LAT_DEG)]]))
+        srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et_emission, "IAU_" + BLOCKEE, [[np.deg2rad(LON_DEG),np.deg2rad(LAT_DEG)]]))
     else:
-        start_rec, _, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", BLOCKEE, et, "IAU_" + BLOCKEE, ABCORR, OBSERVER)
         start_lonlat = spice.reclat(start_rec)[1:]
         norm_sub_obs_vec = sub_observer_vector / np.linalg.norm(sub_observer_vector)
-        srf_points, longitudes, latitudes = create_pos_array(et, start_lonlat) 
+        srf_points, longitudes, latitudes = create_pos_array(et_emission, start_lonlat) 
     
     if (MODE == "Still" and not POINT):
-        blocking_total = blocking_moment(srf_points, et)
-        moments.append(et)
+        blocking_total = blocking_moment(srf_points, et_emission)
+        moments.append(et_reception)
     else:
-        for i, moment in enumerate(range(et-TIME_FRAME, et+TIME_FRAME+1, TIME_STEP)):
+        for i, moment_reception in enumerate(range(et_reception-TIME_FRAME, et_reception+TIME_FRAME+1, TIME_STEP)):
+            moment_emission = moment_reception - light_travel_time
             print(f"Calculating moment {i+1}/{(2*TIME_FRAME)//TIME_STEP+1}...")
-            blocking_at_moment = blocking_moment(srf_points, moment)
+            blocking_at_moment = blocking_moment(srf_points, moment_emission)
             blocking_total = np.vstack([blocking_total, blocking_at_moment]) if blocking_total.size else blocking_at_moment
-            moments.append(moment)
+            moments.append(moment_reception)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
     
@@ -276,7 +282,7 @@ def get_illum(moment: int,
               ) -> tuple[np.ndarray[np.bool], np.ndarray[np.float64]]:
     '''
     Calculates the illumination data for each surface point on BLOCKEE, including if it is illuminated at all and the incidence angle.
-    DEPENDS ON GLOBALS BLOCKEE, ABCORR
+    DEPENDS ON GLOBALS BLOCKEE, ABCORR, OBSERVER
 
     Args:
         moment (int):                                       Ephemeris time for which to calculate illumination data
@@ -291,10 +297,9 @@ def get_illum(moment: int,
     incidence_angles = []
 
     for srf_point in srf_points:
-        # Sun is observer here since we want the numeric values on the surface, not as seen from the observer.
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
         _, _, _, incdnc, _, _, lit = spice.illumf(
-            "ELLIPSOID", BLOCKEE, "Sun", moment, "IAU_"+BLOCKEE, ABCORR, "Sun", srf_point)
+            "ELLIPSOID", BLOCKEE, "Sun", moment, "IAU_"+BLOCKEE, ABCORR, OBSERVER, srf_point)
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
 
