@@ -41,16 +41,16 @@ Add possibility to output illumination of a flat plane at the center of the moon
 #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
 
 # Two shadow transits in the same spot on Jupiter with Io and Callisto
-UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
+#UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
 # endregion
 
 # region Evaluation times:
 # Callisto Eval times:
-#BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
+BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
 
 #UTC = "2025-11-12 08:08:26" # Start 1
 #UTC = "2025-11-12 09:42:39" # Start 2
-#UTC = "2025-11-12 13:10:30" # Start 3
+UTC = "2025-11-12 13:29:30" # Start 3 EDITED
 #UTC = "2025-11-12 12:55:29" # Start 4
 
 #UTC = "2025-11-12 08:44:58" # Stop 1
@@ -60,29 +60,29 @@ UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
 # endregion
 
 # region Observers:
-OBSERVER = "Sun"
+#OBSERVER = "Sun"
 #OBSERVER = "Callisto"
 #OBSERVER = "Moon"
 #OBSERVER = "HST"
-#OBSERVER = "Earth"
+OBSERVER = "Earth"
 #OBSERVER = "Jupiter"
 # endregion
 
 # Available ouput modes: Still, Slider, Animation
 # Available Presentation ways: 2D, Dots, Surface
 MODE = "Slider"
-PRESENTATION = "Surface"
+PRESENTATION = "2D"
 
 # Flags:
 POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
-CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
+CALCULATE_ILLUMINATION = False     # Chooses if the illumination function is used; bettcer lighting but slower
 HALF_MOON = True     # Chooses if only half the moon should be shown
 
 
 #Simulation Fidelity:
-RESOLUTION = 50      # Number of points in each direction for surface point array, so total number of points is resolution^2
-TIME_FRAME = 10000   # The time in seconds that the animation includes, back and forth
-TIME_STEP = 1000     # The time in seconds that each step moves forward with
+RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
+TIME_FRAME = 100   # The time in seconds that the animation includes, back and forth
+TIME_STEP = 99     # The time in seconds that each step moves forward with
 
 # region Coordinates for Point tracking mode
 LAT_DEG = 0.04
@@ -90,10 +90,10 @@ LON_DEG = 27.42
 # endregion
 
 # region Surface point zone zooming and panning:
-LAT_OFFSET = np.deg2rad(1.2) # Default 0 (double shadow 1.2) [Range: -90 to 90]
-LON_OFFSET = np.deg2rad(-18) # Default 0 (double shadow -18) [Range: -180 to 180]
-LAT_PORTION = 20 # Default 1 (double shadow 20) Values>1
-LON_PORTION = 1 + HALF_MOON + 40 # Default 1 + half_moon (double shadow +40) Values>1
+LAT_OFFSET = np.deg2rad(0) # Default 0 (double shadow 1.2) [Range: -90 to 90]
+LON_OFFSET = np.deg2rad(0) # Default 0 (double shadow -18) [Range: -180 to 180]
+LAT_PORTION = 1 # Default 1 (double shadow 20) Values>1
+LON_PORTION = 1 + HALF_MOON + 0 # Default 1 + half_moon (double shadow +40) Values>1
 # endregion
 
 # region Other options:
@@ -125,7 +125,9 @@ def main() -> None:
     if POINT:
         srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et, "IAU_" + BLOCKEE, [[np.deg2rad(LON_DEG),np.deg2rad(LAT_DEG)]]))
     else:
-        start_lonlat = spice.reclat(spice.subpnt("NEAR POINT/ELLIPSOID", BLOCKEE, et, "IAU_" + BLOCKEE, ABCORR, OBSERVER)[0])[1:]
+        start_rec, _, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", BLOCKEE, et, "IAU_" + BLOCKEE, ABCORR, OBSERVER)
+        start_lonlat = spice.reclat(start_rec)[1:]
+        norm_sub_obs_vec = sub_observer_vector / np.linalg.norm(sub_observer_vector)
         srf_points, longitudes, latitudes = create_pos_array(et, start_lonlat) 
     
     if (MODE == "Still" and not POINT):
@@ -143,7 +145,7 @@ def main() -> None:
     if POINT:
         graph_point(blocking_total, moments, solar_constant)
     elif PRESENTATION == "2D":
-        graph_2d(longitudes, latitudes, blocking_total, moments, solar_constant)
+        graph_2d(longitudes, latitudes, srf_points, blocking_total, moments, solar_constant, norm_sub_obs_vec)
     elif PRESENTATION == "Dots":
         visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat)
     elif PRESENTATION == "Surface":
@@ -699,84 +701,82 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
 def graph_2d(longitudes: np.ndarray[np.float64],
              latitudes: np.ndarray[np.float64],
+             srf_points: np.ndarray[np.ndarray[np.float64]],
              blocked_data: np.ndarray[np.ndarray[np.float64]],
              moments: list[int],
-             solar_constant: float):
+             solar_constant: float,
+             obs_to_body_vec: np.ndarray[np.float64]):
     '''
     Plots the 2D surface of the entire body, with illumination
+    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, OBSERVER, MODE
 
     Args:
-        longitudes (np.ndarray[np.float64]):                list of longitudes
-        latitudes (np.ndarray[np.float64]):                 list of latitudes
+        longitudes (np.ndarray):                            Array of longitudes for the surface points.
+        latitudes (np.ndarray):                             Array of latitudes for the surface points.
+        srf_points (np.ndarray):                            Surface points in IAU body-fixed frame, shape (N, 3).
         blocked_data (np.ndarray[np.ndarray[np.float64]]):  List of blocked data for the points and the moments
         moments (list[int]):                                List of times which should be plotted
         solar_constant (float):                             The solar irradiance at the body and average time
+        obs_to_body_vec (np.ndarray[np.float64]):           Normalized vector from observer to body center
     '''
-    n_lat = len(latitudes)
-    n_lon = len(longitudes)
+
+    arbitrary = np.array([0, 0, 1]) if abs(obs_to_body_vec[2]) < 0.9 else np.array([1, 0, 0])
+    u_axis = np.cross(obs_to_body_vec, arbitrary)
+    u_axis /= np.linalg.norm(u_axis)
+    v_axis = np.cross(obs_to_body_vec, u_axis)
+
+    # projection on surface plane:
+    u_coords = srf_points @ u_axis
+    v_coords = -(srf_points @ v_axis)
+
+    u_grid = u_coords.reshape(len(latitudes), len(longitudes))
+    v_grid = v_coords.reshape(len(latitudes), len(longitudes))
+
+    def make_image(illum_1d):
+        return illum_1d.reshape(len(latitudes), len(longitudes))
+    
+
     illumination = np.array((1 - blocked_data) * solar_constant)
+    if illumination.ndim == 2:
+        initial = illumination[0]
+    else:
+        initial = illumination
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
+    img = ax.pcolormesh(u_grid, v_grid, make_image(initial), 
+                    cmap="gray", vmin=0, vmax=solar_constant, shading="auto")
+    fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
+    title = ax.set_title(f"{BLOCKEE} — {spice.et2utc(moments[0], 'C', 0)}")
+
+    ax.set_facecolor('darkblue')
+
     match MODE:
         case "Still":
-            data_2d = illumination.reshape(n_lat, n_lon)
-            img = ax.pcolormesh(
-                np.degrees(longitudes),
-                np.degrees(latitudes),
-                data_2d,
-                cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
-            )
-            fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
-            ax.set_xlabel("Longitude (°)")
-            ax.set_ylabel("Latitude (°)")
-            ax.set_title(f"{BLOCKEE} — {spice.et2utc(moments[0], 'C', 0)}")
+            pass
 
         case "Slider":
-            data_2d = illumination[0].reshape(n_lat, n_lon)
-            img = ax.pcolormesh(
-                np.degrees(longitudes),
-                np.degrees(latitudes),
-                data_2d,
-                cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
-            )
-            fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
-            ax.set_xlabel("Longitude (°)")
-            ax.set_ylabel("Latitude (°)")
-            title = ax.set_title(f"{BLOCKEE} — {spice.et2utc(moments[0], 'C', 0)}")
-
             plt.subplots_adjust(bottom=0.25)
             slider_ax = plt.axes([0.2, 0.0, 0.6, 0.03])
             slider = Slider(slider_ax, "Time step", 0, len(moments)-1, valinit=0, valstep=1)
 
             def update_slider(val):
                 idx = int(slider.val)
-                img.set_array(illumination[idx].reshape(n_lat, n_lon).ravel())
+                img.set_array(make_image(illumination[idx]).ravel())
                 title.set_text(f"{BLOCKEE} — {spice.et2utc(moments[idx], 'C', 0)}")
                 fig.canvas.draw_idle()
 
             slider.on_changed(update_slider)
-        case "Animation":
-            data_2d = illumination[0].reshape(n_lat, n_lon)
-            img = ax.pcolormesh(
-                np.degrees(longitudes),
-                np.degrees(latitudes),
-                data_2d,
-                cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
-            )
-            fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
-            ax.set_xlabel("Longitude (°)")
-            ax.set_ylabel("Latitude (°)")
-            title = ax.set_title("")
 
+        case "Animation":
             def update(frame):
-                data_2d = illumination[frame].reshape(n_lat, n_lon)
-                img.set_array(data_2d.ravel())
+                img.set_array(make_image(illumination[frame]).ravel())
                 title.set_text(f"{BLOCKEE} — {spice.et2utc(moments[frame], 'C', 0)}")
                 return img, title
 
             ani = FuncAnimation(fig, update, frames=len(moments), interval=100, blit=False)
         
+    ax.set_aspect('equal', adjustable='box')
     plt.tight_layout()
     plt.show()
 
