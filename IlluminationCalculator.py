@@ -58,6 +58,8 @@ HALF_MOON              = None
 RESOLUTION             = None
 TIME_FRAME             = None
 TIME_STEP              = None
+LAT_DEG                = None
+LON_DEG                = None
 LAT_OFFSET             = None
 LON_OFFSET             = None
 LAT_PORTION            = None
@@ -77,7 +79,7 @@ if USE_ASSIGNED_CONFIG:
     UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 07:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
-    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
+    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
     # endregion
 
     # region Evaluation times:
@@ -968,7 +970,7 @@ def select_parameters():
     print("  This can be skipped by manually setting any variable in the code before running.\n")
 
     # ── bodies ────────────────────────────────────────────────────────────────
-    _section("Bodies")
+    _section("Bodies & Time")
 
     if not BLOCKEE:
         BLOCKEE = _pick("Blockee (body to be occulted)", BODIES)
@@ -986,38 +988,44 @@ def select_parameters():
     if not UTC:
         UTC = _ask_utc("UTC start time", UTC)
 
+    # ── Point ───────────────────────────────────────────────────────────────
+    _section("Point-tracking mode")
+
+    if POINT is None:
+        print("\nNote: Point-tracking mode will only calculate illumination for a single surface point, which can be useful for detailed analysis.")
+        POINT = _ask_bool("Point-tracking mode", False)
+    
     # ── display ───────────────────────────────────────────────────────────────
     _section("Display")
 
-    if not MODE:
+    if not MODE and not POINT:
         MODE = _pick("Output mode", MODES)
 
-    if not PRESENTATION:
+    if not PRESENTATION and not POINT:
         PRESENTATION = _pick("Presentation", PRESENTS)
 
     # ── flags ─────────────────────────────────────────────────────────────────
     _section("Flags")
-
-    if POINT is None:
-        POINT = _ask_bool("Point-tracking mode  (overrides mode/presentation)", False)
     if CALCULATE_ILLUMINATION is None:
+        print("\nNote: Calculating illumination will include calculations of solar incidence angle effects but may slow down the simulation.")
         CALCULATE_ILLUMINATION = _ask_bool("Calculate illumination  (better lighting, slower)", True)
-    if HALF_MOON is None:
+    if HALF_MOON is None and not POINT:
         HALF_MOON = _ask_bool("Show only half moon", True)
 
     # ── fidelity ──────────────────────────────────────────────────────────────
     _section("Simulation fidelity")
 
-    if RESOLUTION is None:
+    if RESOLUTION is None and not POINT:
         RESOLUTION = _ask_int("Resolution  (points per axis)", 10, 500, 100)
     if TIME_FRAME is None:
-        TIME_FRAME = _ask_int("Time frame  (seconds)", 1, 86400, 1000)
+        TIME_FRAME = _ask_int("Time frame  (seconds forwards and backwards from set time)", 1, 86400, 1000)
     if TIME_STEP is None:
-        TIME_STEP  = _ask_int("Time step   (seconds)", 1, TIME_FRAME, 100)
+        TIME_STEP  = _ask_int("Time step   (seconds between each calculated moment)", 1, TIME_FRAME, 100)
 
     # ── point-tracking coords (only when relevant) ────────────────────────────
     if POINT:
         _section("Point-tracking coordinates")
+        print("Note: Latitude and longitude are in planetocentric coordinates, where latitude is the angle from the equator (positive northward) and longitude is the angle from the prime meridian (positive eastward).")
         if LAT_DEG is None:
             LAT_DEG = _ask_float("Latitude  (°)",  -90,  90,  0.0)
         if LON_DEG is None:
@@ -1029,15 +1037,15 @@ def select_parameters():
     # ── zooming / panning ─────────────────────────────────────────────────────
     _section("Surface view — zoom & pan")
 
-    if LAT_OFFSET is None:
+    if LAT_OFFSET is None and not POINT:
         lat_off_deg = _ask_float("Latitude offset  (°)", -90,  90,  0.0)
         LAT_OFFSET  = np.deg2rad(lat_off_deg)
-    if LON_OFFSET is None:
+    if LON_OFFSET is None and not POINT:
         lon_off_deg = _ask_float("Longitude offset (°)", -180, 180, 0.0)
         LON_OFFSET  = np.deg2rad(lon_off_deg)
-    if LAT_PORTION is None:
+    if LAT_PORTION is None and not POINT:
         LAT_PORTION = _ask_float("Latitude zoom  (>1 = zoom in)", 1, 200, 1.0)
-    if LON_PORTION is None:
+    if LON_PORTION is None and not POINT:
         lon_default = 1 + int(HALF_MOON)
         LON_PORTION = _ask_float("Longitude zoom (>1 = zoom in)", 1, 200, lon_default)
 
