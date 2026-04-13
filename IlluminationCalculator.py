@@ -25,7 +25,7 @@ from matplotlib.animation import FuncAnimation
 # ║   If youre reading this, you are able to change model parameters in the code,            ║
 # ║   skipping the questionnare at the start of code running in terminal.                    ║
 # ║   Do this by changing this flag to TRUE instead of FALSE                                 ║
-# ║   The code will then instead use the parameters you have selected in the following code  ║                                                                        ║
+# ║   The code will then instead follow selection in "if USE_ASSIGNED_CONFIG:"               ║                                                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
 USE_ASSIGNED_CONFIG = False  
 
