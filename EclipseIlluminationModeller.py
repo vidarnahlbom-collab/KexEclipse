@@ -1,3 +1,40 @@
+import importlib
+import subprocess
+import sys
+
+DEPENDENCIES = [
+    ("spiceypy", "spiceypy"),
+    ("numpy", "numpy"),
+    ("matplotlib", "matplotlib"),
+    ("mplcursors", "mplcursors"),
+    ("scipy", "scipy"),
+]
+
+def ensure_dependencies():
+    missing = []
+    for package, import_name in DEPENDENCIES:
+        try:
+            importlib.import_module(import_name)
+        except ImportError:
+            missing.append(package)
+
+    if missing:
+        print(f"Installing missing packages: {', '.join(missing)}")
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", *missing],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            print("Done! Continuing...\n")
+        except subprocess.CalledProcessError:
+            print(f"\nFailed to install: {', '.join(missing)}")
+            print("Try manually: pip install " + " ".join(missing))
+            sys.exit(1)
+
+ensure_dependencies()
+
+# Safe to import now
 import spiceypy as spice
 import os
 import numpy as np
@@ -197,15 +234,34 @@ def main() -> None:
 
 def furnish_kernels() -> None:
     '''
-    Furnishes kernels
+    Recursively furnishes all SPICE kernels found at the script's level and below.
     '''
-    kernel_dir = "kernels"
-    spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
-    spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
-    spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
-    spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
-    spice.furnsh(os.path.join(kernel_dir, "hst_edited.bsp"))
+    kernel_extensions = {".tls", ".bsp", ".tpc", ".tf", ".tsc", ".ck", ".spk"}
+    base_dir = os.path.dirname(os.path.abspath(__file__))
 
+    furnished = []
+    failed = []
+
+    for root, _, files in os.walk(base_dir):
+        for file in sorted(files):
+            if os.path.splitext(file)[1].lower() in kernel_extensions:
+                path = os.path.join(root, file)
+                try:
+                    spice.furnsh(path)
+                    furnished.append(path)
+                except Exception as e:
+                    failed.append((path, e))
+
+    if not furnished:
+        print("No kernels found.")
+        sys.exit(1)
+
+    print(f"Furnished {len(furnished)} kernel(s).")
+
+    if failed:
+        print(f"Warning: {len(failed)} kernel(s) failed to load:")
+        for path, err in failed:
+            print(f"  {path}: {err}")
 
 
 def get_solar_constant(et: int) -> float:
