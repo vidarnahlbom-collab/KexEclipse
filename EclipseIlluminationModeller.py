@@ -1,3 +1,27 @@
+# ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+# ║                                                                                          ║
+# ║   ██████╗ ███████╗ █████╗ ██████╗     ███╗   ███╗███████╗                                ║
+# ║   ██╔══██╗██╔════╝██╔══██╗██╔══██╗    ████╗ ████║██╔════╝                                ║
+# ║   ██████╔╝█████╗  ███████║██║  ██║    ██╔████╔██║█████╗                                  ║
+# ║   ██╔══██╗██╔══╝  ██╔══██║██║  ██║    ██║╚██╔╝██║██╔══╝                                  ║
+# ║   ██║  ██║███████╗██║  ██║██████╔╝    ██║ ╚═╝ ██║███████╗                                ║
+# ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
+# ║                                                                                          ║
+# ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
+# ║   2026-04-13  ·  KEX L5                                                                  ║
+# ║                                                                                          ║
+# ║                                                                                          ║
+# ║   Jupiter moon eclipse & illumination simulator                                          ║
+# ║   Uses SPICE kernels via SpiceyPy for ephemeris data                                     ║
+# ║                                                                                          ║
+# ║   If youre reading this, you are able to change model parameters in the code,            ║
+# ║   skipping the questionnare at the start of code running in terminal.                    ║
+# ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
+# ║   The code will then instead follow selection in "if USE_ASSIGNED_CONFIG:"               ║                                                                      ║
+# ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+USE_ASSIGNED_CONFIG = True
+
+
 import importlib
 import subprocess
 import sys
@@ -43,28 +67,39 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.animation import FuncAnimation
 
-# ╔══════════════════════════════════════════════════════════════════════════════════════════╗
-# ║                                                                                          ║
-# ║   ██████╗ ███████╗ █████╗ ██████╗     ███╗   ███╗███████╗                                ║
-# ║   ██╔══██╗██╔════╝██╔══██╗██╔══██╗    ████╗ ████║██╔════╝                                ║
-# ║   ██████╔╝█████╗  ███████║██║  ██║    ██╔████╔██║█████╗                                  ║
-# ║   ██╔══██╗██╔══╝  ██╔══██║██║  ██║    ██║╚██╔╝██║██╔══╝                                  ║
-# ║   ██║  ██║███████╗██║  ██║██████╔╝    ██║ ╚═╝ ██║███████╗                                ║
-# ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
-# ║                                                                                          ║
-# ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
-# ║   2026-04-13  ·  KEX L5                                                                  ║
-# ║                                                                                          ║
-# ║                                                                                          ║
-# ║   Jupiter moon eclipse & illumination simulator                                          ║
-# ║   Uses SPICE kernels via SpiceyPy for ephemeris data                                     ║
-# ║                                                                                          ║
-# ║   If youre reading this, you are able to change model parameters in the code,            ║
-# ║   skipping the questionnare at the start of code running in terminal.                    ║
-# ║   Do this by changing this flag to TRUE instead of FALSE                                 ║
-# ║   The code will then instead follow selection in "if USE_ASSIGNED_CONFIG:"               ║                                                                      ║
-# ╚══════════════════════════════════════════════════════════════════════════════════════════╝
-USE_ASSIGNED_CONFIG = False  
+def furnish_kernels() -> None:
+    '''
+    Recursively furnishes all SPICE kernels found at the script's level and below.
+    '''
+    kernel_extensions = {".tls", ".bsp", ".tpc", ".tf", ".tsc", ".ck", ".spk"}
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    furnished = []
+    failed = []
+
+    for root, _, files in os.walk(base_dir):
+        for file in sorted(files):
+            if os.path.splitext(file)[1].lower() in kernel_extensions:
+                path = os.path.join(root, file)
+                try:
+                    spice.furnsh(path)
+                    furnished.append(path)
+                except Exception as e:
+                    failed.append((path, e))
+
+    if not furnished:
+        print("No kernels found.")
+        sys.exit(1)
+
+    print(f"Furnished {len(furnished)} kernel(s).")
+
+    if failed:
+        print(f"Warning: {len(failed)} kernel(s) failed to load:")
+        for path, err in failed:
+            print(f"  {path}: {err}")
+
+furnish_kernels()
+
 
 # region Current errors:
 # Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
@@ -107,19 +142,19 @@ ABCORR        = "LT+S"
 if USE_ASSIGNED_CONFIG:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
-    #UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
+    UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
 
     # Jupiter eclipsed by Io
     #UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
 
     # Triple shadow transit
-    UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 07:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
+    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 07:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
     # endregion
 
-    # region Evaluation times:
+    # region Evaluation times (Ignore):
     # Callisto Eval times:
     #BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
     #UTC = "2025-11-12 13:55:33" # partial penumbral
@@ -182,12 +217,9 @@ def main() -> None:
     '''
     Main function defining program flow
     '''
-    furnish_kernels()
-
     start_time = time.time()
     
     et_reception = int(spice.utc2et(UTC))
-    print(UTC)
 
     # We will store the blocked fractions for every time step here, so we can use it for the animation later without having to recalculate it. 
     # This is a 2D array where each row corresponds to a time step and each column corresponds to a surface point.
@@ -230,38 +262,6 @@ def main() -> None:
     elif PRESENTATION == "Surface":
         visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
 
-
-
-def furnish_kernels() -> None:
-    '''
-    Recursively furnishes all SPICE kernels found at the script's level and below.
-    '''
-    kernel_extensions = {".tls", ".bsp", ".tpc", ".tf", ".tsc", ".ck", ".spk"}
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-
-    furnished = []
-    failed = []
-
-    for root, _, files in os.walk(base_dir):
-        for file in sorted(files):
-            if os.path.splitext(file)[1].lower() in kernel_extensions:
-                path = os.path.join(root, file)
-                try:
-                    spice.furnsh(path)
-                    furnished.append(path)
-                except Exception as e:
-                    failed.append((path, e))
-
-    if not furnished:
-        print("No kernels found.")
-        sys.exit(1)
-
-    print(f"Furnished {len(furnished)} kernel(s).")
-
-    if failed:
-        print(f"Warning: {len(failed)} kernel(s) failed to load:")
-        for path, err in failed:
-            print(f"  {path}: {err}")
 
 
 def get_solar_constant(et: int) -> float:
@@ -527,6 +527,7 @@ def _add_slider(fig, n_frames: int):
     slider = Slider(slider_ax, "Time step", 0, n_frames - 1,
                     valinit=0, valstep=1)
     return slider
+
 
 
 def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
@@ -901,7 +902,6 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
     plt.show()
 
 
-
 # region── helpers ───────────────────────────────────────────────────────────────────
 def _ask(prompt: str, validator, default=None, hint: str = ""):
     """Loop until the user gives a valid answer (or accepts the default)."""
@@ -991,7 +991,7 @@ def _ask_utc(label: str, default: str) -> str:
     def validate(raw):
         return raw if pattern.match(raw) else None
     return _ask(label, validate, default=default or None,
-                hint='Format: YYYY Mon DD HH:MM:SS  e.g. "2015 Jan 24 05:16:22"')
+                hint='Format: YYYY Mon DD HH:MM:SS  e.g. "2015 Jan 24 06:27:01"')
 
 
 def _section(title: str):
@@ -1073,9 +1073,9 @@ def select_parameters():
 
     if RESOLUTION is None and not POINT:
         RESOLUTION = _ask_int("Resolution  (points per axis)", 10, 500, 100)
-    if TIME_FRAME is None:
+    if TIME_FRAME is None and MODE != "Still":
         TIME_FRAME = _ask_int("Time frame  (seconds forwards and backwards from set time)", 1, 86400, 1000)
-    if TIME_STEP is None:
+    if TIME_STEP is None and MODE != "Still":
         TIME_STEP  = _ask_int("Time step   (seconds between each calculated moment)", 1, TIME_FRAME, 100)
 
     # ── point-tracking coords (only when relevant) ────────────────────────────
@@ -1111,6 +1111,7 @@ def select_parameters():
     print("╚══════════════════════════════════════╝")
     cfg = dict(
         BLOCKEE=BLOCKEE, BLOCKERS=BLOCKERS, OBSERVER=OBSERVER,
+        UTC=UTC,
         MODE=MODE, PRESENTATION=PRESENTATION,
         POINT=POINT, CALCULATE_ILLUMINATION=CALCULATE_ILLUMINATION,
         HALF_MOON=HALF_MOON,

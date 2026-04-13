@@ -7,17 +7,11 @@
 # Originally that part of code is from akkana spice examples on github
 # https://github.com/akkana/spice-examples/blob/master/transits.py
 
+import sys
 import spiceypy as spice
 import os
 
 def main():
-    # Load all kernels
-    kernel_dir = "kernels"
-    spice.furnsh(os.path.join(kernel_dir, "naif0012.tls"))
-    spice.furnsh(os.path.join(kernel_dir, "de442s.bsp"))
-    spice.furnsh(os.path.join(kernel_dir, "jup365.bsp"))
-    spice.furnsh(os.path.join(kernel_dir, "pck00011.tpc"))
-
 
     # Search for all types of eclipses. Depends on observer. if Sun is observer, you might get annular eclipses of Jupiter by a moon
     # but if observer is a moon, you will never get annular eclipses because no moon enters jupiters antumbra shadow, so jupiter either partially
@@ -27,38 +21,24 @@ def main():
     # for then some other part of the moon thats not the center is in the penumbral shadow. 
     # Searching for ANY should yield times for any type of occlusion of the center is happening
     # Unsure how light time and stellar abberation correction is done now. 
-    
-    # After further testing, the times given out are in UTC, so can be put into the URL of for example NASA Eyes and yeild correct results.
-    # However do note that only the URL is correct, the time in the NASA Eyes program are adjusted to your location so for us mostly UTC+1 or +2
-    
-    #types = [ "FULL", "ANNULAR", "PARTIAL", "ANY" ]
-    types = ["ANY"]
 
-    # Start and end times for the search window
-    start = "2021 APR 18 00:00:00 TDB"
-    end = "2021 MAY 20 00:00:00 TDB"
-    
-    # x-minute step. Ignore any occultations lasting less than ~x minutes.
-    # Units are TDB seconds.
-    # 15 min steps might be to large, currently getting partials at less than 15 min
-    step = 100.0
+    start, end, types, moons, bodies1, body2, step = select_parameters_occultation()
 
-    # To start, moons will be observers so therefore modelled as point objects
-    moons = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"] 
+    start = spice.str2et(start)
+    end   = spice.str2et(end)
 
-    # bodies1 will be occluders, all these objects will be checked for occluding the sun
-    #bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO"]  # This will be front object
-    bodies1 = ["JUPITER"]
-    #bodies1 = ["IO", "GANYMEDE", "EUROPA", "CALLISTO", "JUPITER"]
-    # Checking if Sun is being in fully occluded by Jupiter, so Sun is back object
-    body2 = "SUN"
-    
     for moon in moons:
-        for body1 in bodies1: 
-            if moon != body1:
-                occultations(types, body1, body2, moon, start, end, step)
+        for body1 in bodies1:
+            if moon.upper() != body1.upper():
+                _, trgepc, _ = spice.subpnt("NEAR POINT/ELLIPSOID", moon.upper(), start,
+                                            "IAU_" + moon.upper(), "LT+S", "EARTH")
+                light_travel_time = start - trgepc
+                occultations(types, body1.upper(), body2.upper(), moon.upper(),
+                             start - light_travel_time,
+                             end   - light_travel_time,
+                             light_travel_time, step)
   
-def occultations(types, body1, body2, obsrvr, start, end, step):
+def occultations(types, body1, body2, obsrvr, start, end, light_travel_time, step):
     # Size of the window/intervall between start and end date, not sure how it works
     MAXWIN = 200
 
@@ -69,8 +49,10 @@ def occultations(types, body1, body2, obsrvr, start, end, step):
 
     # Obtain the TDB time bounds of the confinement
     # window, which is a single interval in this case.
-    et0 = spice.str2et(start)
-    et1 = spice.str2et(end)
+    #et0 = spice.str2et(start)
+    #et1 = spice.str2et(end)
+    et0 = start
+    et1 = end
 
     # Insert the time bounds into the confinement window
     spice.wninsd(et0, et1, cnfine)
@@ -101,7 +83,208 @@ def occultations(types, body1, body2, obsrvr, start, end, step):
             count = spice.wncard(result)
             for i in range(count):
                 left, right = spice.wnfetd(result, i)
-                print("Start:", spice.timout(left, "YYYY Mon DD HR:MN:SC"), "   End:", spice.timout(right, "YYYY Mon DD HR:MN:SC"))
+                print("Start:", spice.timout(left+light_travel_time, "YYYY Mon DD HR:MN:SC"), "   End:", spice.timout(right+light_travel_time, "YYYY Mon DD HR:MN:SC"))
 
-if __name__ == '__main__':
+
+# region── helpers ───────────────────────────────────────────────────────────────────
+def _ask(prompt: str, validator, default=None, hint: str = ""):
+    """Loop until the user gives a valid answer (or accepts the default)."""
+    while True:
+        if hint:
+            print(f"  {hint}")
+        suffix = f" [{default}]" if default is not None else ""
+        raw = input(f"  {prompt}{suffix}: ").strip()
+        if raw == "" and default is not None:
+            return default
+        result = validator(raw)
+        if result is not None:
+            return result
+        print("  ✗ Invalid — try again.\n")
+
+
+def _pick(label: str, options: list[str], *, default: str | None = None,
+          exclude: list[str] | None = None) -> str:
+    """Prompt for a single choice from a list."""
+    available = [o for o in options if o not in (exclude or [])]
+    hint = "Options: " + ", ".join(available)
+
+    def validate(raw):
+        # case-insensitive match
+        for o in available:
+            if raw.lower() == o.lower():
+                return o
+        return None
+
+    return _ask(label, validate, default=default, hint=hint)
+
+
+def _pick_multi(label: str, options: list[str], *, exclude: list[str] | None = None) -> list[str]:
+    """Prompt for a comma-separated subset; empty = all except excluded."""
+    available = [o for o in options if o not in (exclude or [])]
+
+    def validate(raw):
+        if raw == "":
+            return available           # empty → all
+        parts = [p.strip().capitalize() for p in raw.split(",")]
+        if all(p in available for p in parts) and parts:
+            return parts
+        return None
+
+    return _ask(label, validate,
+                hint=f"Options: {', '.join(available)}  (enter for all)")
+
+
+def _ask_float(label: str, lo: float, hi: float, default: float) -> float:
+    def validate(raw):
+        try:
+            v = float(raw)
+            return v if lo <= v <= hi else None
+        except ValueError:
+            return None
+    return _ask(label, validate, default=default,
+                hint=f"Range {lo} – {hi}")
+
+
+def _ask_int(label: str, lo: int, hi: int, default: int) -> int:
+    def validate(raw):
+        try:
+            v = int(raw)
+            return v if lo <= v <= hi else None
+        except ValueError:
+            return None
+    return _ask(label, validate, default=default,
+                hint=f"Range {lo} – {hi}")
+
+
+def _ask_bool(label: str, default: bool) -> bool:
+    def validate(raw):
+        if raw.lower() in ("y", "yes", "true",  "1"): return True
+        if raw.lower() in ("n", "no",  "false", "0"): return False
+        return None
+    # Pass the actual bool as default, and validate it through the same function
+    result = _ask(label, validate, default="y" if default else "n", hint="y / n")
+    # _ask returns the raw default string when user hits Enter — re-validate it
+    if isinstance(result, str):
+        return result.lower() in ("y", "yes", "true", "1")
+    return result
+
+
+def _ask_utc(label: str, default: str) -> str:
+    import re
+    pattern = re.compile(r"^\d{4} \w{3} \d{2} \d{2}:\d{2}:\d{2}$")
+    def validate(raw):
+        return raw if pattern.match(raw) else None
+    return _ask(label, validate, default=default or None,
+                hint='Format: YYYY Mon DD HH:MM:SS  e.g. "2015 Jan 24 06:27:01"')
+
+
+def _section(title: str):
+    print(f"\n{'─'*50}")
+    print(f"  {title}")
+    print(f"{'─'*50}")
+# endregion
+
+def select_parameters_occultation() -> tuple[str, str, list[str], str, float, float, float]:
+    '''
+    Asks the user to select parameters for occultation search.
+
+    Returns:
+        start (str):            UTC start time
+        end (str):              UTC end time
+        types (list[str]):      Occultation types to search for
+        body2 (str):            The back body (usually "Sun")
+        moons (list[str]):      Observer moons
+        bodies1 (list[str]):    Occluding bodies
+        step (float):           Search step size in seconds
+    '''
+
+    BODIES    = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
+    OCC_TYPES = ["Full", "Annular", "Partial", "Any"]
+
+    print("\n╔══════════════════════════════════════╗")
+    print("║   Occultation search setup           ║")
+    print("╚══════════════════════════════════════╝")
+    print("  Press Enter to accept [defaults] shown in brackets.\n")
+
+    # ── time window ───────────────────────────────────────────────────────────
+    _section("Time window")
+
+    start = _ask_utc("Start time", "2026 Jan 1 00:00:00")
+    end   = _ask_utc("End time",   "2026 Apr 1 00:00:00")
+
+    # ── bodies ────────────────────────────────────────────────────────────────
+    _section("Bodies")
+
+    print("  Hint: Observer moons are treated as point sources.")
+    moons   = _pick_multi("Observer moon(s)", BODIES)
+    bodies1 = _pick_multi("Occluding body/bodies (front)", BODIES)
+
+    back_options = ["Sun"] + BODIES
+    body2 = _pick("Back body (being occulted)", back_options, default="Sun")
+
+    # ── occultation types ─────────────────────────────────────────────────────
+    _section("Occultation types")
+
+    print("  Full    — observer in umbra (total eclipse)")
+    print("  Annular — back body ring visible around front")
+    print("  Partial — observer in penumbra")
+    print("  Any     — any of the above")
+    types = _pick_multi("Type(s) to search for", OCC_TYPES)
+
+    # ── search fidelity ───────────────────────────────────────────────────────
+    _section("Search fidelity")
+
+    step = float(_ask_int(
+        "Search step (seconds) — events shorter than this may be missed",
+        lo=1, hi=86400, default=100
+    ))
+
+    # ── summary ───────────────────────────────────────────────────────────────
+    print("\n╔══════════════════════════════════════╗")
+    print("║   Configuration summary              ║")
+    print("╚══════════════════════════════════════╝")
+    cfg = dict(start=start, end=end, types=types,
+               moons=moons, bodies1=bodies1, body2=body2, step=step)
+    col = max(len(k) for k in cfg)
+    for k, v in cfg.items():
+        print(f"  {k:<{col}} = {v}")
+    print()
+
+    return start, end, types, moons, bodies1, body2, step
+
+
+def furnish_kernels() -> None:
+    '''
+    Recursively furnishes all SPICE kernels found at the script's level and below.
+    '''
+    kernel_extensions = {".tls", ".bsp", ".tpc", ".tf", ".tsc", ".ck", ".spk"}
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    furnished = []
+    failed = []
+
+    for root, _, files in os.walk(base_dir):
+        for file in sorted(files):
+            if os.path.splitext(file)[1].lower() in kernel_extensions:
+                path = os.path.join(root, file)
+                try:
+                    spice.furnsh(path)
+                    furnished.append(path)
+                except Exception as e:
+                    failed.append((path, e))
+
+    if not furnished:
+        print("No kernels found.")
+        sys.exit(1)
+
+    print(f"Furnished {len(furnished)} kernel(s).")
+
+    if failed:
+        print(f"Warning: {len(failed)} kernel(s) failed to load:")
+        for path, err in failed:
+            print(f"  {path}: {err}")
+
+
+if __name__ == '__main__':  
+    furnish_kernels()
     main()
