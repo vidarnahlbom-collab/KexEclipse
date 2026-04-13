@@ -13,13 +13,16 @@
 # ║                                                                                          ║
 # ║   Jupiter moon eclipse & illumination simulator                                          ║
 # ║   Uses SPICE kernels via SpiceyPy for ephemeris data                                     ║
+# ║   These can be downloaded at https://naif.jpl.nasa.gov/pub/naif/generic_kernels/         ║
+# ║   Required files are: de442s.bsp, jup365.bsp, naif0012.tls, pck00011.tpc                 ║
+# ║   And additionally hst_edited.bsp if Hubble Space Telescope is to be used as observer.   ║
 # ║                                                                                          ║
 # ║   If youre reading this, you are able to change model parameters in the code,            ║
 # ║   skipping the questionnare at the start of code running in terminal.                    ║
 # ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
-# ║   The code will then instead follow selection in "if USE_ASSIGNED_CONFIG:"               ║                                                                      ║
+# ║   The code will then instead follow selection in "if USE_ASSIGNED_CONFIG:".              ║                                                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
-USE_ASSIGNED_CONFIG = True
+USE_ASSIGNED_CONFIG = False
 
 
 import importlib
