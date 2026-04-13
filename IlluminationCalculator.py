@@ -6,10 +6,28 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.animation import FuncAnimation
 
-
-# Vidar Cardell Nahlbom, Andreas Jensen Herres
-# 2026-03-05
-# KEX L5
+# ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+# ║                                                                                          ║
+# ║   ██████╗ ███████╗ █████╗ ██████╗     ███╗   ███╗███████╗                                ║
+# ║   ██╔══██╗██╔════╝██╔══██╗██╔══██╗    ████╗ ████║██╔════╝                                ║
+# ║   ██████╔╝█████╗  ███████║██║  ██║    ██╔████╔██║█████╗                                  ║
+# ║   ██╔══██╗██╔══╝  ██╔══██║██║  ██║    ██║╚██╔╝██║██╔══╝                                  ║
+# ║   ██║  ██║███████╗██║  ██║██████╔╝    ██║ ╚═╝ ██║███████╗                                ║
+# ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
+# ║                                                                                          ║
+# ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
+# ║   2026-04-13  ·  KEX L5                                                                  ║
+# ║                                                                                          ║
+# ║                                                                                          ║
+# ║   Jupiter moon eclipse & illumination simulator                                          ║
+# ║   Uses SPICE kernels via SpiceyPy for ephemeris data                                     ║
+# ║                                                                                          ║
+# ║   If youre reading this, you are able to change model parameters in the code,            ║
+# ║   skipping the questionnare at the start of code running in terminal.                    ║
+# ║   Do this by changing this flag to TRUE instead of FALSE                                 ║
+# ║   The code will then instead use the parameters you have selected in the following code  ║                                                                        ║
+# ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+USE_ASSIGNED_CONFIG = False  
 
 # region Current errors:
 # Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
@@ -27,82 +45,98 @@ from matplotlib.animation import FuncAnimation
 # endregion 
 
 # region forced global inits
-BLOCKEE = ""
-BLOCKERS = []
-OBSERVER = ""
-MODE = ""
-PRESENTATION = ""
+#── defaults ──────────────────────────────────────────────────────────────────
+BLOCKEE       = ""
+BLOCKERS      = []
+OBSERVER      = ""
+MODE          = ""
+PRESENTATION  = ""
+UTC           = ""
+POINT                  = None   # will become False/True after prompt
+CALCULATE_ILLUMINATION = None
+HALF_MOON              = None
+RESOLUTION             = None
+TIME_FRAME             = None
+TIME_STEP              = None
+LAT_OFFSET             = None
+LON_OFFSET             = None
+LAT_PORTION            = None
+LON_PORTION            = None
+ABCORR        = "LT+S"
 # endregion
 
-# region Spacetime Presets:
-# Europa eclipsed by Jupiter
-#UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 15:26:31", "Europa", ['Jupiter']   
+if USE_ASSIGNED_CONFIG:
+    # region Spacetime Presets:
+    # Europa eclipsed by Jupiter
+    #UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
 
-# Jupiter eclipsed by Io
-#UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 06:35:33", "Jupiter", ['Io'] 
+    # Jupiter eclipsed by Io
+    #UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
 
-# Triple shadow transit
-#UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
+    # Triple shadow transit
+    UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 07:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
 
-# Two shadow transits in the same spot on Jupiter with Io and Callisto
-#UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
-# endregion
+    # Two shadow transits in the same spot on Jupiter with Io and Callisto
+    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 05:16:22", "Jupiter", ['Io', 'Callisto']
+    # endregion
 
-# region Evaluation times:
-# Callisto Eval times:
-BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
-UTC = "2025-11-12 13:55:33" # partial penumbral
+    # region Evaluation times:
+    # Callisto Eval times:
+    #BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
+    #UTC = "2025-11-12 13:55:33" # partial penumbral
 
-#UTC = "2025-11-12 08:08:26" # Start 1
-#UTC = "2025-11-12 09:42:39" # Start 2
-#UTC = "2025-11-12 13:10:30" # Start 3
-#UTC = "2025-11-12 12:55:29" # Start 4
+    #UTC = "2025-11-12 08:08:26" # Start 1
+    #UTC = "2025-11-12 09:42:39" # Start 2
+    #UTC = "2025-11-12 13:10:30" # Start 3
+    #UTC = "2025-11-12 12:55:29" # Start 4
 
-#UTC = "2025-11-12 08:44:58" # Stop 1
-#UTC = "2025-11-12 10:19:08" # Stop 2
-#UTC = "2025-11-12 19:43:06" # Stop 3
-#UTC = "2025-11-12 13:05:43" # Stop 4
-# endregion
+    #UTC = "2025-11-12 08:44:58" # Stop 1
+    #UTC = "2025-11-12 10:19:08" # Stop 2
+    #UTC = "2025-11-12 19:43:06" # Stop 3
+    #UTC = "2025-11-12 13:05:43" # Stop 4
+    # endregion
 
-# region Observers:
-#OBSERVER = "Sun"
-#OBSERVER = "Callisto"
-#OBSERVER = "Moon"
-#OBSERVER = "HST"
-OBSERVER = "Earth"
-#OBSERVER = "Jupiter"
-# endregion
+    # region Observers:
+    #OBSERVER = "Sun"
+    #OBSERVER = "Callisto"
+    #OBSERVER = "Moon"
+    #OBSERVER = "HST"
+    OBSERVER = "Earth"
+    #OBSERVER = "Jupiter"
+    # endregion
 
-# Available ouput modes: Still, Slider, Animation
-# Available Presentation ways: 2D, Dots, Surface
-MODE = "Slider"
-PRESENTATION = "2D"
+    # region MAIN CONFIGURATION:
+    # Available ouput modes: Still, Slider, Animation
+    # Available Presentation ways: 2D, Dots, Surface
+    MODE = "Slider"
+    PRESENTATION = "Surface"
 
-# Flags:
-POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
-CALCULATE_ILLUMINATION = False     # Chooses if the illumination function is used; bettcer lighting but slower
-HALF_MOON = True     # Chooses if only half the moon should be shown
+    # Flags:
+    POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
+    CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
+    HALF_MOON = True     # Chooses if only half the moon should be shown
 
-#Simulation Fidelity:
-RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
-TIME_FRAME = 30 # The time in seconds that the animation includes, back and forth
-TIME_STEP = 5     # The time in seconds that each step moves forward with
+    #Simulation Fidelity:
+    RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    TIME_FRAME = 1000 # The time in seconds that the animation includes, back and forth
+    TIME_STEP = 100     # The time in seconds that each step moves forward with
+    # endregion
 
-# region Coordinates for Point tracking mode
-LAT_DEG = 0.04
-LON_DEG = 27.42
-# endregion
+    # region Coordinates for Point tracking mode
+    LAT_DEG = 0.04
+    LON_DEG = 27.42
+    # endregion
 
-# region Surface point zone zooming and panning:
-LAT_OFFSET = np.deg2rad(-45) # Default 0 (double shadow 1.2) [Range: -90 to 90]
-LON_OFFSET = np.deg2rad(-45) # Default 0 (double shadow -18) [Range: -180 to 180]
-LAT_PORTION = 4 # Default 1 (double shadow 20) Values>1
-LON_PORTION = 1 + HALF_MOON + 2 # Default 1 + half_moon (double shadow +40) Values>1
-# endregion
+    # region Surface point zone zooming and panning:
+    LAT_OFFSET = np.deg2rad(0) # Default 0 (double shadow 1.2) [Range: -90 to 90]
+    LON_OFFSET = np.deg2rad(0) # Default 0 (double shadow -18) [Range: -180 to 180]
+    LAT_PORTION = 1 # Default 1 (double shadow 20) Values>1
+    LON_PORTION = 1 + HALF_MOON + 0 # Default 1 + half_moon (double shadow +40) Values>1
+    # endregion
 
-# region Other options:
-ABCORR = "LT+S"
-# endregion
+    # region Other options:
+    ABCORR = "LT+S"
+    # endregion
 
 
 def main() -> None:
@@ -172,14 +206,16 @@ def furnish_kernels() -> None:
 
 
 
-def select_bodies() -> tuple[str, list[str], str]:
+def select_parameters() -> tuple[str, list[str], str]:
     '''
-    Asks the user to select blockee and obstructing bodies
+    Asks the user to select blockee, blockers, observer, time, timeframe, timestep,  mode, presenta
 
     Returns:
         blockee (str):         The body which will be blocked
         blockers (list[str]):   The bodies which will be used to block the blockee
         observer (str):         The body from which the observation will be made
+        mode (str):             The mode that will be used to display
+        presentation (str):     The presentation that will be used to display
     '''
     bodies = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
 
@@ -214,20 +250,7 @@ def select_bodies() -> tuple[str, list[str], str]:
         if observer in bodies + ["Sun", "Earth", "Moon", "HST"] and observer != blockee:
             break
         print("INVALID")
-    
-    return blockee, blockers, observer
 
-
-
-def select_mode_and_presentation() -> tuple[str, str]:
-    '''
-    Asks the user how they wish to display the result (Still, Slider or Animation)
-    and 2D, Dots or Surface
-
-    Returns:
-        mode (str):             The mode that will be used to display
-        presentation (str):     The presentation that will be used to display
-    '''
     modes = ["Still", "Slider", "Animation"]
     presentations = ["2d", "Dots", "Surface"]
 
@@ -248,6 +271,21 @@ def select_mode_and_presentation() -> tuple[str, str]:
                 presentation = "2D"
             break
         print("INVALID")
+    
+    return blockee, blockers, observer
+
+
+
+def select_mode_and_presentation() -> tuple[str, str]:
+    '''
+    
+
+    Returns:
+
+    '''
+
+
+
 
     return mode, presentation
 
@@ -484,6 +522,39 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
            partial_overlap)))
 
 
+# region ── Shared visualisation layout ───────────────────────────────────────────────
+_FIG_W, _FIG_H   = 14, 9
+_PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
+_CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
+_SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
+_TITLE_X, _TITLE_Y = 0.02, 0.97
+_TITLE_FS         = 11
+_TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
+                 wrap=True, linespacing=1.8, transform=None)  # transform set per-fig
+# endregion
+
+def _make_title_str(moment: float) -> str:
+    return (f"Blockee: {BLOCKEE}\n"
+            f"Blockers: {',\n'.join(BLOCKERS)}\n"
+            f"Observer: {OBSERVER}\n"
+            f"UTC: {spice.et2utc(moment, 'C', 0)}")
+
+
+def _add_colorbar(fig, mappable, solar_constant: float):
+    cbar_ax = fig.add_axes(_CBAR_RECT)
+    cb = fig.colorbar(mappable, cax=cbar_ax)
+    cb.set_label('Illumination (W/m²)')
+    cb.set_ticks([0, solar_constant])
+    cb.set_ticklabels(['0', f'{solar_constant:.1f}'])
+    return cbar_ax
+
+
+def _add_slider(fig, n_frames: int):
+    slider_ax = fig.add_axes(_SLIDER_RECT)
+    slider = Slider(slider_ax, "Time step", 0, n_frames - 1,
+                    valinit=0, valstep=1)
+    return slider
+
 
 def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          srf_points: np.ndarray[np.ndarray[np.float64]],
@@ -526,19 +597,17 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         # Note: We flatten it to a long list of colors
         return np.column_stack([fc.ravel(), fc.ravel(), fc.ravel(), np.ones(fc.size)])
 
-    def make_title(moment):
-        return f"Illumination on {BLOCKEE}\nBlockers: {blocker_str}\nObserver: {OBSERVER}\nUTC: {spice.et2utc(moment, 'C', 0)}"
-    
     def update(frame):
         idx = int(frame)
         # 1. Update colors (Optimized: uses flattened array)
         surf.set_facecolor(all_facecolors[idx])
         # 2. Update title
-        title.set_text(make_title(moments[idx]))
+        title.set_text(_make_title_str(moments[idx]))
         # 3. Force draw (draw_idle is better for interactivity)
         fig.canvas.draw_idle()
         return surf, title
 
+    # ── geometry ──────────────────────────────────────────────────────────────
     # create the surface:
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
@@ -556,26 +625,22 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     Ys = r * np.sin(u) * np.sin(v)
     Zs = r * np.cos(v)
 
-    # Initialize figure
-    fig = plt.figure(figsize=(12, 9))
-    ax = fig.add_axes([0.0, 0.0, 0.78, 1.0], projection='3d')
+    # ── figure ────────────────────────────────────────────────────────────────
+    fig = plt.figure(figsize=(_FIG_W, _FIG_H))
+    ax  = fig.add_axes(_PLOT_RECT, projection='3d')
+    ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)'); ax.set_zlabel('Z (km)')
 
-    ax.set_xlabel('X (km)')
-    ax.set_ylabel('Y (km)')
-    ax.set_zlabel('Z (km)')
+    # Colorbar — fake ScalarMappable so colorbar works with manual facecolors
+    sm = plt.cm.ScalarMappable(cmap='gray',
+                               norm=plt.Normalize(vmin=0, vmax=solar_constant))
+    sm.set_array([])
+    _add_colorbar(fig, sm, solar_constant)
 
-    # Add colorbar
-    cbar_ax = fig.add_axes([0.82, 0.15, 0.1, 0.55])
-    gradient = np.linspace(0, 1, 256).reshape(256, 1)
-    cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
-    cbar_ax.set_xticks([])
-    cbar_ax.set_yticks([0, 255])
-    cbar_ax.set_yticklabels(['0', f'{solar_constant:.1f}'])
-    cbar_ax.set_ylabel('Illumination (W/m²)')
+    # Title (left edge of figure)
+    title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
+                     **{**_TITLE_KW, 'transform': fig.transFigure})
 
-    # Data for title creating later
-    blocker_str = ', '.join(BLOCKERS)
-
+    # ── surface ───────────────────────────────────────────────────────────────
     # Calculate all facecolors:
     initial_facecolor = blocked_to_facecolors(0).reshape(len(latitudes)-1, len(longitudes)-1, 4)# FOR SOME REASON THIS IS A DIFFERENT SHAPE
     all_facecolors = [blocked_to_facecolors(i) for i in range(len(moments))]
@@ -584,24 +649,15 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     surf = ax.plot_surface(Xs, Ys, Zs, facecolors=initial_facecolor,
                            shade=False, edgecolor='none', linewidth=0, antialiased=False,
                            rcount=len(latitudes), ccount=len(longitudes))
-
-    # Initial title
-    title = fig.text(0.83, 0.92, make_title(moments[0]), 
-                 fontsize=15, va='top', ha='left', 
-                 wrap=True, linespacing=1.6)
-
+    
+    # ── mode ──────────────────────────────────────────────────────────────────
     match MODE:
-        case "Slider":
-            # Add slider
-            plt.subplots_adjust(bottom=0.25)
-            slider_ax = plt.axes([0.82, 0.08, 0.14, 0.03])
-            slider = Slider(slider_ax, "Time", 0, len(moments)-1, valinit=0, valstep=1)
+        case "Still":
+            pass  # already set up for still mode, no updates needed
 
-            # Capture slider object to prevent garbage collection
-            def slider_update(val):
-                update(val)
-            slider.on_changed(slider_update)
-            # Attach to fig to keep reference alive
+        case "Slider":
+            slider = _add_slider(fig, len(moments))
+            slider.on_changed(update)
             fig.slider = slider
 
         case "Animation":
@@ -644,75 +700,57 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
         solar_constant (float):     The irradiance at the body.
         start_lonlat (tuple[float, float]): The starting longitude and latitude for the view.
     '''
+    def make_colors(blocked):
+        return np.column_stack([1-blocked, 1-blocked, 1-blocked])
+
     x = np.array([p[0] for p in srf_points])
     y = np.array([p[1] for p in srf_points])
     z = np.array([p[2] for p in srf_points])
 
-    blocker_str = ', '.join(BLOCKERS)
+    # ── figure ────────────────────────────────────────────────────────────────
+    fig = plt.figure(figsize=(_FIG_W, _FIG_H))
+    ax  = fig.add_axes(_PLOT_RECT, projection='3d')
+    ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)'); ax.set_zlabel('Z (km)')
 
-    fig = plt.figure(figsize=(12, 9))
-    ax = fig.add_axes([0.0, 0.0, 0.78, 1.0], projection='3d')
+    sm = plt.cm.ScalarMappable(cmap='gray',
+                               norm=plt.Normalize(vmin=0, vmax=solar_constant))
+    sm.set_array([])
+    _add_colorbar(fig, sm, solar_constant)
 
-    ax.set_xlabel('X (km)')
-    ax.set_ylabel('Y (km)')
-    ax.set_zlabel('Z (km)')
+    title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
+                     **{**_TITLE_KW, 'transform': fig.transFigure})
 
-    cbar_ax = fig.add_axes([0.82, 0.15, 0.1, 0.55])  # [left, bottom, width, height]
-    gradient = np.linspace(0, 1, 256).reshape(256, 1)
-    cbar_ax.imshow(gradient, aspect='auto', cmap='gray', origin='lower')
-    cbar_ax.set_xticks([])
-    cbar_ax.set_yticks([0, 255])
-    cbar_ax.set_yticklabels(['0', f'{solar_constant:.1f}'])
-    cbar_ax.set_ylabel('Illumination (W/m²)')
-
-    def make_colors(blocked):
-        return np.column_stack([1-blocked, 1-blocked, 1-blocked])
-
-    def make_title(moment):
-        return f"Illumination on {BLOCKEE}\nBlockers: {blocker_str}\nObserver: {OBSERVER}\nUTC: {spice.et2utc(moment, 'C', 0)}"
-
-    title = fig.text(0.83, 0.92, make_title(moments[0]), 
-                 fontsize=15, va='top', ha='left', 
-                 wrap=True, linespacing=1.6)
-
+    # ── mode ──────────────────────────────────────────────────────────────────
     match MODE:
         case "Still":
             ax.scatter(x, y, z, c=make_colors(blocked_data), s=20)            
 
         case "Slider":
-            # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
+            slider  = _add_slider(fig, len(moments))
 
-            # Slider
-            plt.subplots_adjust(bottom=0.25)
-            slider_ax = plt.axes([0.82, 0.08, 0.14, 0.03])
-            slider = Slider(slider_ax, "Time step", 0, len(blocked_data)-1, valinit=0, valstep=1)
-            
             def update_slider(val):
                 idx = int(slider.val)
                 scatter.set_color(make_colors(blocked_data[idx]))
-                title.set_text(make_title(moments[idx]))
+                title.set_text(_make_title_str(moments[idx]))
                 fig.canvas.draw_idle()
+
+            slider.on_changed(update_slider)
+            fig.slider = slider
 
             slider.on_changed(update_slider)
 
         case "Animation":
-            # Initial frame
             scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
-        
-            # Animation
+
             def update_animation(frame):
                 scatter.set_color(make_colors(blocked_data[frame]))
-                title.set_text(make_title(moments[frame]))
+                title.set_text(_make_title_str(moments[frame]))
                 return scatter,
 
-            ani = FuncAnimation(
-                fig, 
-                update_animation, 
-                frames=len(blocked_data), 
-                interval=100, # Milliseonds between frames
-                blit=False
-            )
+            ani = FuncAnimation(fig, update_animation, frames=len(blocked_data),
+                                interval=100, blit=False)
+            fig.ani = ani
         
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
@@ -750,7 +788,7 @@ def graph_2d(longitudes: np.ndarray[np.float64],
         solar_constant (float):                             The solar irradiance at the body and average time
         obs_to_body_vec (np.ndarray[np.float64]):           Normalized vector from observer to body center
     '''
-
+    # ── projection ────────────────────────────────────────────────────────────
     arbitrary = np.array([0, 0, 1]) if abs(obs_to_body_vec[2]) < 0.9 else np.array([1, 0, 0])
     u_axis = np.cross(obs_to_body_vec, arbitrary)
     u_axis /= np.linalg.norm(u_axis)
@@ -763,52 +801,61 @@ def graph_2d(longitudes: np.ndarray[np.float64],
     u_grid = u_coords.reshape(len(latitudes), len(longitudes))
     v_grid = v_coords.reshape(len(latitudes), len(longitudes))
 
-    def make_image(illum_1d):
-        return illum_1d.reshape(len(latitudes), len(longitudes))
-    
-
     illumination = np.array((1 - blocked_data) * solar_constant)
     if illumination.ndim == 2:
         initial = illumination[0]
     else:
         initial = illumination
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    def make_image(illum_1d):
+        return illum_1d.reshape(len(latitudes), len(longitudes))
 
-    img = ax.pcolormesh(u_grid, v_grid, make_image(initial), 
-                    cmap="gray", vmin=0, vmax=solar_constant, shading="auto")
-    fig.colorbar(img, ax=ax, label="Illumination (W/m^2)")
-    title = ax.set_title(f"{BLOCKEE} — {spice.et2utc(moments[0], 'C', 0)}")
+    # ── figure ────────────────────────────────────────────────────────────────
+    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H))
+    fig.subplots_adjust(left=_PLOT_RECT[0], bottom=_PLOT_RECT[1],
+                        right=_PLOT_RECT[0]+_PLOT_RECT[2],
+                        top=_PLOT_RECT[1]+_PLOT_RECT[3])
 
+    img = ax.pcolormesh(u_grid, v_grid, make_image(initial),
+                        cmap='gray', vmin=0, vmax=solar_constant, shading='auto')
     ax.set_facecolor('darkblue')
+    ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)')
+    ax.set_aspect('equal', adjustable='box')
 
+    _add_colorbar(fig, img, solar_constant)
+
+    title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
+                     **{**_TITLE_KW, 'transform': fig.transFigure})
+
+    # ── mode ──────────────────────────────────────────────────────────────────
     match MODE:
         case "Still":
             pass
 
         case "Slider":
-            plt.subplots_adjust(bottom=0.25)
-            slider_ax = plt.axes([0.2, 0.0, 0.6, 0.03])
-            slider = Slider(slider_ax, "Time step", 0, len(moments)-1, valinit=0, valstep=1)
+            slider = _add_slider(fig, len(moments))
 
             def update_slider(val):
                 idx = int(slider.val)
                 img.set_array(make_image(illumination[idx]).ravel())
-                title.set_text(f"{BLOCKEE} — {spice.et2utc(moments[idx], 'C', 0)}")
+                title.set_text(_make_title_str(moments[idx]))
                 fig.canvas.draw_idle()
 
             slider.on_changed(update_slider)
+            fig.slider = slider
 
         case "Animation":
             def update(frame):
                 img.set_array(make_image(illumination[frame]).ravel())
-                title.set_text(f"{BLOCKEE} — {spice.et2utc(moments[frame], 'C', 0)}")
+                title.set_text(_make_title_str(moments[frame]))
                 return img, title
 
-            ani = FuncAnimation(fig, update, frames=len(moments), interval=100, blit=False)
+            ani = FuncAnimation(fig, update, frames=len(moments),
+                                interval=100, blit=False)
+            fig.ani = ani
         
-    ax.set_aspect('equal', adjustable='box')
-    plt.tight_layout()
+    #ax.set_aspect('equal', adjustable='box')
+    #plt.tight_layout()
     plt.show()
 
 
@@ -882,9 +929,227 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
 
 
-if __name__ == '__main__':
-    if BLOCKEE == "" or not BLOCKERS or OBSERVER == "":
-        BLOCKEE, BLOCKERS, OBSERVER = select_bodies()
-    if MODE == "" or PRESENTATION == "":
-        MODE, PRESENTATION = select_mode_and_presentation()
+# region── helpers ───────────────────────────────────────────────────────────────────
+def _ask(prompt: str, validator, default=None, hint: str = ""):
+    """Loop until the user gives a valid answer (or accepts the default)."""
+    while True:
+        if hint:
+            print(f"  {hint}")
+        suffix = f" [{default}]" if default is not None else ""
+        raw = input(f"  {prompt}{suffix}: ").strip()
+        if raw == "" and default is not None:
+            return default
+        result = validator(raw)
+        if result is not None:
+            return result
+        print("  ✗ Invalid — try again.\n")
+
+
+def _pick(label: str, options: list[str], *, default: str | None = None,
+          exclude: list[str] | None = None) -> str:
+    """Prompt for a single choice from a list."""
+    available = [o for o in options if o not in (exclude or [])]
+    hint = "Options: " + ", ".join(available)
+
+    def validate(raw):
+        # case-insensitive match
+        for o in available:
+            if raw.lower() == o.lower():
+                return o
+        return None
+
+    return _ask(label, validate, default=default, hint=hint)
+
+
+def _pick_multi(label: str, options: list[str], *, exclude: list[str] | None = None) -> list[str]:
+    """Prompt for a comma-separated subset; empty = all except excluded."""
+    available = [o for o in options if o not in (exclude or [])]
+
+    def validate(raw):
+        if raw == "":
+            return available           # empty → all
+        parts = [p.strip().capitalize() for p in raw.split(",")]
+        if all(p in available for p in parts) and parts:
+            return parts
+        return None
+
+    return _ask(label, validate,
+                hint=f"Options: {', '.join(available)}  (enter for all)")
+
+
+def _ask_float(label: str, lo: float, hi: float, default: float) -> float:
+    def validate(raw):
+        try:
+            v = float(raw)
+            return v if lo <= v <= hi else None
+        except ValueError:
+            return None
+    return _ask(label, validate, default=default,
+                hint=f"Range {lo} – {hi}")
+
+
+def _ask_int(label: str, lo: int, hi: int, default: int) -> int:
+    def validate(raw):
+        try:
+            v = int(raw)
+            return v if lo <= v <= hi else None
+        except ValueError:
+            return None
+    return _ask(label, validate, default=default,
+                hint=f"Range {lo} – {hi}")
+
+
+def _ask_bool(label: str, default: bool) -> bool:
+    def validate(raw):
+        if raw.lower() in ("y", "yes", "true",  "1"): return True
+        if raw.lower() in ("n", "no",  "false", "0"): return False
+        return None
+    # Pass the actual bool as default, and validate it through the same function
+    result = _ask(label, validate, default="y" if default else "n", hint="y / n")
+    # _ask returns the raw default string when user hits Enter — re-validate it
+    if isinstance(result, str):
+        return result.lower() in ("y", "yes", "true", "1")
+    return result
+
+
+def _ask_utc(label: str, default: str) -> str:
+    import re
+    pattern = re.compile(r"^\d{4} \w{3} \d{2} \d{2}:\d{2}:\d{2}$")
+    def validate(raw):
+        return raw if pattern.match(raw) else None
+    return _ask(label, validate, default=default or None,
+                hint='Format: YYYY Mon DD HH:MM:SS  e.g. "2015 Jan 24 05:16:22"')
+
+
+def _section(title: str):
+    print(f"\n{'─'*50}")
+    print(f"  {title}")
+    print(f"{'─'*50}")
+# endregion
+
+# ── main selector ─────────────────────────────────────────────────────────────
+def select_parameters():
+    """
+    Interactively fill in any configuration variable that isn't already set.
+
+    Returns the full configuration as a dict so callers can unpack what
+    they need.  Global variables that were already non-empty are left
+    unchanged and skipped in the prompts.
+    """
+    global BLOCKEE, BLOCKERS, OBSERVER, MODE, PRESENTATION, UTC
+    global POINT, CALCULATE_ILLUMINATION, HALF_MOON
+    global RESOLUTION, TIME_FRAME, TIME_STEP
+    global LAT_DEG, LON_DEG, LAT_OFFSET, LON_OFFSET, LAT_PORTION, LON_PORTION
+
+    BODIES    = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
+    OBSERVERS = BODIES + ["Sun", "Earth", "Moon", "HST"]
+    MODES     = ["Still", "Slider", "Animation"]
+    PRESENTS  = ["2D", "Dots", "Surface"]
+
+    print("\n╔══════════════════════════════════════╗")
+    print("║   Simulation parameter setup         ║")
+    print("╚══════════════════════════════════════╝")
+    print("  Press Enter to accept [defaults] shown in brackets.\n")
+    print("  This can be skipped by manually setting any variable in the code before running.\n")
+
+    # ── bodies ────────────────────────────────────────────────────────────────
+    _section("Bodies")
+
+    if not BLOCKEE:
+        BLOCKEE = _pick("Blockee (body to be occulted)", BODIES)
+
+    if not BLOCKERS:
+        BLOCKERS = _pick_multi(
+            "Blockers — comma-separated, or Enter for all others",
+            BODIES, exclude=[BLOCKEE]
+        )
+
+    if not OBSERVER:
+        OBSERVER = _pick("Observer", OBSERVERS,
+                         default="Earth", exclude=[BLOCKEE])
+        
+    if not UTC:
+        UTC = _ask_utc("UTC start time", UTC)
+
+    # ── display ───────────────────────────────────────────────────────────────
+    _section("Display")
+
+    if not MODE:
+        MODE = _pick("Output mode", MODES)
+
+    if not PRESENTATION:
+        PRESENTATION = _pick("Presentation", PRESENTS)
+
+    # ── flags ─────────────────────────────────────────────────────────────────
+    _section("Flags")
+
+    if POINT is None:
+        POINT = _ask_bool("Point-tracking mode  (overrides mode/presentation)", False)
+    if CALCULATE_ILLUMINATION is None:
+        CALCULATE_ILLUMINATION = _ask_bool("Calculate illumination  (better lighting, slower)", True)
+    if HALF_MOON is None:
+        HALF_MOON = _ask_bool("Show only half moon", True)
+
+    # ── fidelity ──────────────────────────────────────────────────────────────
+    _section("Simulation fidelity")
+
+    if RESOLUTION is None:
+        RESOLUTION = _ask_int("Resolution  (points per axis)", 10, 500, 100)
+    if TIME_FRAME is None:
+        TIME_FRAME = _ask_int("Time frame  (seconds)", 1, 86400, 1000)
+    if TIME_STEP is None:
+        TIME_STEP  = _ask_int("Time step   (seconds)", 1, TIME_FRAME, 100)
+
+    # ── point-tracking coords (only when relevant) ────────────────────────────
+    if POINT:
+        _section("Point-tracking coordinates")
+        if LAT_DEG is None:
+            LAT_DEG = _ask_float("Latitude  (°)",  -90,  90,  0.0)
+        if LON_DEG is None:
+            LON_DEG = _ask_float("Longitude (°)", -180, 180, 0.0)
+    else:
+        LAT_DEG = 0.0
+        LON_DEG = 0.0
+
+    # ── zooming / panning ─────────────────────────────────────────────────────
+    _section("Surface view — zoom & pan")
+
+    if LAT_OFFSET is None:
+        lat_off_deg = _ask_float("Latitude offset  (°)", -90,  90,  0.0)
+        LAT_OFFSET  = np.deg2rad(lat_off_deg)
+    if LON_OFFSET is None:
+        lon_off_deg = _ask_float("Longitude offset (°)", -180, 180, 0.0)
+        LON_OFFSET  = np.deg2rad(lon_off_deg)
+    if LAT_PORTION is None:
+        LAT_PORTION = _ask_float("Latitude zoom  (>1 = zoom in)", 1, 200, 1.0)
+    if LON_PORTION is None:
+        lon_default = 1 + int(HALF_MOON)
+        LON_PORTION = _ask_float("Longitude zoom (>1 = zoom in)", 1, 200, lon_default)
+
+    # ── summary ───────────────────────────────────────────────────────────────
+    print("\n╔══════════════════════════════════════╗")
+    print("║   Configuration summary              ║")
+    print("╚══════════════════════════════════════╝")
+    cfg = dict(
+        BLOCKEE=BLOCKEE, BLOCKERS=BLOCKERS, OBSERVER=OBSERVER,
+        MODE=MODE, PRESENTATION=PRESENTATION,
+        POINT=POINT, CALCULATE_ILLUMINATION=CALCULATE_ILLUMINATION,
+        HALF_MOON=HALF_MOON,
+        RESOLUTION=RESOLUTION, TIME_FRAME=TIME_FRAME, TIME_STEP=TIME_STEP,
+        LAT_DEG=LAT_DEG, LON_DEG=LON_DEG,
+        LAT_OFFSET=LAT_OFFSET, LON_OFFSET=LON_OFFSET,
+        LAT_PORTION=LAT_PORTION, LON_PORTION=LON_PORTION,
+        ABCORR=ABCORR,
+    )
+    col = max(len(k) for k in cfg)
+    for k, v in cfg.items():
+        print(f"  {k:<{col}} = {v}")
+    print()
+
+    return cfg
+
+
+# ── entry point ───────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    cfg = select_parameters()
     main()
