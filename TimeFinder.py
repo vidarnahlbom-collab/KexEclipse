@@ -7,11 +7,79 @@
 # Originally that part of code is from akkana spice examples on github
 # https://github.com/akkana/spice-examples/blob/master/transits.py
 
+# region Initial setup: dependency check, kernel furnishing
+import importlib
+import subprocess
 import sys
+
+DEPENDENCIES = [
+    ("spiceypy", "spiceypy"),
+]
+
+def ensure_dependencies():
+    missing = []
+    for package, import_name in DEPENDENCIES:
+        try:
+            importlib.import_module(import_name)
+        except ImportError:
+            missing.append(package)
+
+    if missing:
+        print(f"Installing missing packages: {', '.join(missing)}")
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", *missing],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            print("Done! Continuing...\n")
+        except subprocess.CalledProcessError:
+            print(f"\nFailed to install: {', '.join(missing)}")
+            print("Try manually: pip install " + " ".join(missing))
+            sys.exit(1)
+
+ensure_dependencies()
+
 import spiceypy as spice
 import os
 
+def furnish_kernels() -> None:
+    '''
+    Recursively furnishes all SPICE kernels found at the script's level and below.
+    '''
+    kernel_extensions = {".tls", ".bsp", ".tpc", ".tf", ".tsc", ".ck", ".spk"}
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    furnished = []
+    failed = []
+
+    for root, _, files in os.walk(base_dir):
+        for file in sorted(files):
+            if os.path.splitext(file)[1].lower() in kernel_extensions:
+                path = os.path.join(root, file)
+                try:
+                    spice.furnsh(path)
+                    furnished.append(path)
+                except Exception as e:
+                    failed.append((path, e))
+
+    if not furnished:
+        print("No kernels found.")
+        sys.exit(1)
+
+    print(f"Furnished {len(furnished)} kernel(s).")
+
+    if failed:
+        print(f"Warning: {len(failed)} kernel(s) failed to load:")
+        for path, err in failed:
+            print(f"  {path}: {err}")
+
+furnish_kernels()
+# endregion
+
 def main():
+
+    manual_selection = False
 
     # Search for all types of eclipses. Depends on observer. if Sun is observer, you might get annular eclipses of Jupiter by a moon
     # but if observer is a moon, you will never get annular eclipses because no moon enters jupiters antumbra shadow, so jupiter either partially
@@ -20,9 +88,31 @@ def main():
     # If searching for partial, then the printed time periods will be periods with penumbral shadows, as well as some additional time around each date
     # for then some other part of the moon thats not the center is in the penumbral shadow. 
     # Searching for ANY should yield times for any type of occlusion of the center is happening
-    # Unsure how light time and stellar abberation correction is done now. 
 
-    start, end, types, moons, bodies1, body2, step = select_parameters_occultation()
+    if manual_selection:
+        # The start time of the search window in UTC:
+        start = "2026 Jan 1 00:00:00"
+
+        # The end time of the search window in UTC:
+        end   = "2026 Apr 1 00:00:00"
+
+        # The search step size in seconds. Smaller values may miss short events, but larger values will run faster.
+        step = 100
+
+        # The occultation types to search for. Options: "Full", "Annular", "Partial", "Any"
+        types = ["Full", "Annular", "Partial", "Any"]
+
+        # The back body (being occulted).
+        body2 = "Sun"
+
+        # The observer moon(s). Options: "Io", "Europa", "Ganymede", "Callisto", "Jupiter"
+        # So standing on the moon, looking at the sun, and checking if jupiter or another moon is in the way.
+        moons   = ["Io", "Europa", "Ganymede", "Callisto"]
+
+        # The occluding body/bodies (front). Options: "Io", "Europa", "Ganymede", "Callisto", "Jupiter"
+        bodies1 = ["Jupiter"]
+    else:
+        start, end, types, moons, bodies1, body2, step = select_parameters_occultation()
 
     start = spice.str2et(start)
     end   = spice.str2et(end)
@@ -253,38 +343,5 @@ def select_parameters_occultation() -> tuple[str, str, list[str], str, float, fl
     return start, end, types, moons, bodies1, body2, step
 
 
-def furnish_kernels() -> None:
-    '''
-    Recursively furnishes all SPICE kernels found at the script's level and below.
-    '''
-    kernel_extensions = {".tls", ".bsp", ".tpc", ".tf", ".tsc", ".ck", ".spk"}
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-
-    furnished = []
-    failed = []
-
-    for root, _, files in os.walk(base_dir):
-        for file in sorted(files):
-            if os.path.splitext(file)[1].lower() in kernel_extensions:
-                path = os.path.join(root, file)
-                try:
-                    spice.furnsh(path)
-                    furnished.append(path)
-                except Exception as e:
-                    failed.append((path, e))
-
-    if not furnished:
-        print("No kernels found.")
-        sys.exit(1)
-
-    print(f"Furnished {len(furnished)} kernel(s).")
-
-    if failed:
-        print(f"Warning: {len(failed)} kernel(s) failed to load:")
-        for path, err in failed:
-            print(f"  {path}: {err}")
-
-
 if __name__ == '__main__':  
-    furnish_kernels()
     main()
