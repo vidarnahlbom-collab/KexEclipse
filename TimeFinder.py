@@ -1,11 +1,32 @@
-# Model both target bodies as ellipsoids.
-# Search for every type of occultation.
-
-# Adapted from the example on the documentation page for gfoclt
-# https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/spicelib/gfoclt.html
-
-# Originally that part of code is from akkana spice examples on github
-# https://github.com/akkana/spice-examples/blob/master/transits.py
+# ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+# ║                                                                                          ║
+# ║   ██████╗ ███████╗ █████╗ ██████╗     ███╗   ███╗███████╗                                ║
+# ║   ██╔══██╗██╔════╝██╔══██╗██╔══██╗    ████╗ ████║██╔════╝                                ║
+# ║   ██████╔╝█████╗  ███████║██║  ██║    ██╔████╔██║█████╗                                  ║
+# ║   ██╔══██╗██╔══╝  ██╔══██║██║  ██║    ██║╚██╔╝██║██╔══╝                                  ║
+# ║   ██║  ██║███████╗██║  ██║██████╔╝    ██║ ╚═╝ ██║███████╗                                ║
+# ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
+# ║                                                                                          ║
+# ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
+# ║   2026-04-13  ·  KEX L5                                                                  ║
+# ║                                                                                          ║
+# ║   Adapted from the example on the documentation page for gfoclt                          ║
+# ║   https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/spicelib/gfoclt.html           ║
+# ║                                                                                          ║
+# ║   Originally that part of code is from akkana spice examples on github                   ║
+# ║   https://github.com/akkana/spice-examples/blob/master/transits.py                       ║                                                               ║
+# ║                                                                                          ║
+# ║   Galilean moon eclipse and transit time finder                                          ║
+# ║   Uses SPICE kernels via SpiceyPy for ephemeris data                                     ║
+# ║   These can be downloaded at https://naif.jpl.nasa.gov/pub/naif/generic_kernels/         ║
+# ║   Required files are: de442s.bsp, jup365.bsp, naif0012.tls, pck00011.tpc                 ║
+# ║                                                                                          ║
+# ║   If youre reading this, you are able to change parameters in the code,                  ║
+# ║   skipping the questionnare at the start of code running in terminal.                    ║
+# ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
+# ║   The code will then instead follow selection in "if MANUAL_SELECTION:" in main().       ║                                                                      ║
+# ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+MANUAL_SELECTION = False
 
 # region Initial setup: dependency check, kernel furnishing
 import importlib
@@ -78,9 +99,6 @@ furnish_kernels()
 # endregion
 
 def main():
-
-    manual_selection = False
-
     # Search for all types of eclipses. Depends on observer. if Sun is observer, you might get annular eclipses of Jupiter by a moon
     # but if observer is a moon, you will never get annular eclipses because no moon enters jupiters antumbra shadow, so jupiter either partially
     # or fully covers the sun. If searching for Full eclipses, penumbral shadow should be relevant around the start and end dates
@@ -89,7 +107,7 @@ def main():
     # for then some other part of the moon thats not the center is in the penumbral shadow. 
     # Searching for ANY should yield times for any type of occlusion of the center is happening
 
-    if manual_selection:
+    if MANUAL_SELECTION:
         # The start time of the search window in UTC:
         start = "2026 Jan 1 00:00:00"
 
@@ -111,6 +129,7 @@ def main():
 
         # The occluding body/bodies (front). Options: "Io", "Europa", "Ganymede", "Callisto", "Jupiter"
         bodies1 = ["Jupiter"]
+        
     else:
         start, end, types, moons, bodies1, body2, step = select_parameters_occultation()
 
@@ -127,7 +146,9 @@ def main():
                              start - light_travel_time,
                              end   - light_travel_time,
                              light_travel_time, step)
-  
+    
+    input("\n\nPress the enter key to exit.")
+
 def occultations(types, body1, body2, obsrvr, start, end, light_travel_time, step):
     # Size of the window/intervall between start and end date, not sure how it works
     MAXWIN = 200

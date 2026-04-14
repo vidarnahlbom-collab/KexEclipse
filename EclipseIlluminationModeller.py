@@ -20,9 +20,9 @@
 # ║   If youre reading this, you are able to change model parameters in the code,            ║
 # ║   skipping the questionnare at the start of code running in terminal.                    ║
 # ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
-# ║   The code will then instead follow selection in "if USE_ASSIGNED_CONFIG:".              ║                                                                      ║
+# ║   The code will then instead follow selection in "if MANUAL_SELECTION:".                 ║                                                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
-USE_ASSIGNED_CONFIG = False
+MANUAL_SELECTION = False
 
 """ Current errors and phenomena not handled by the model:
 Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
@@ -125,7 +125,7 @@ PRESENTATION  = ""
 UTC           = ""
 POINT                  = None   # will become False/True after prompt
 CALCULATE_ILLUMINATION = None
-HALF_MOON              = None
+ONLY_VISIBLE_SURFACE   = None
 RESOLUTION             = None
 TIME_FRAME             = None
 TIME_STEP              = None
@@ -139,7 +139,7 @@ ABCORR        = "LT+S"
 # endregion
 
 
-if USE_ASSIGNED_CONFIG:
+if MANUAL_SELECTION:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
     UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
@@ -188,7 +188,7 @@ if USE_ASSIGNED_CONFIG:
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
     CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
-    HALF_MOON = True     # Chooses if only half the moon should be shown
+    ONLY_VISIBLE_SURFACE = True     # Chooses if only half the blockee should be shown (as seen from the observer)
 
     #Simulation Fidelity:
     RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
@@ -205,7 +205,7 @@ if USE_ASSIGNED_CONFIG:
     LAT_OFFSET = np.deg2rad(0) # Default 0 (double shadow 1.2) [Range: -90 to 90]
     LON_OFFSET = np.deg2rad(0) # Default 0 (double shadow -18) [Range: -180 to 180]
     LAT_PORTION = 1 # Default 1 (double shadow 20) Values>1
-    LON_PORTION = 1 + HALF_MOON + 0 # Default 1 + half_moon (double shadow +40) Values>1
+    LON_PORTION = 1 + ONLY_VISIBLE_SURFACE + 0 # Default 1 + ONLY_VISIBLE_SURFACE (double shadow +40) Values>1
     # endregion
 
     # region Other options:
@@ -402,8 +402,14 @@ def create_pos_array(et: int,
     lat_min = np.clip(lat_center - np.pi/(2*LAT_PORTION), -np.pi/2, np.pi/2)
     lat_max = np.clip(lat_center + np.pi/(2*LAT_PORTION), -np.pi/2, np.pi/2)
 
-    sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION+2)[1:-1] # no poles
-    latitudes = np.arcsin(sin_latitudes)
+    # If the entire occluded body is to be modeled, we also include the poles.
+    # If only the part facing the observer is to be modeled, we remove the poles
+    if ONLY_VISIBLE_SURFACE:
+        sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION+2)[1:-1] # no poles
+        latitudes = np.arcsin(sin_latitudes)
+    else: 
+        sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION)
+        latitudes = np.arcsin(sin_latitudes) 
     
     longitudes = np.linspace(start_lonlat[0]+LON_OFFSET-np.pi/LON_PORTION, start_lonlat[0]+LON_OFFSET+np.pi/LON_PORTION, RESOLUTION)
 
@@ -934,21 +940,24 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
     # Plot
     fig, ax = plt.subplots(figsize=(10, 4))
-
-    # Interpolate for smooth curve
+    
     x_numeric = np.arange(len(moments))
-    x_fine = np.linspace(0, len(moments) - 1, len(moments) * 10)
-    spline = make_interp_spline(x_numeric, illumination, k=3)
-    illumination_smooth = spline(x_fine)
+
+    # Interpolate for smooth curve only if enough points exist (k=3 requires at least 4)
+    if len(moments) >= 4:
+        x_fine = np.linspace(0, len(moments) - 1, len(moments) * 10)
+        spline = make_interp_spline(x_numeric, illumination, k=3)
+        ax.plot(x_fine, illumination_smooth := spline(x_fine), color='white', linewidth=1.5)
+        ax.set_xlim(x_fine[0], x_fine[-1])
+    else:
+        ax.plot(x_numeric, illumination, color='white', linewidth=1.5)
+        ax.set_xlim(x_numeric[0], x_numeric[-1])
 
     # Tick positions and labels (show ~10 evenly spaced)
     tick_indices = np.linspace(0, len(moments) - 1, min(10, len(moments)), dtype=int)
-    tick_positions = x_fine[np.searchsorted(x_fine, tick_indices)]
 
-    ax.plot(x_fine, illumination_smooth, color='white', linewidth=1.5)
-    scatter = ax.scatter(x_numeric, illumination, color='white', s=20, zorder=3)    
+    scatter = ax.scatter(x_numeric, illumination, color='white', s=20, zorder=3)
     cursor = mplcursors.cursor(scatter, hover=True)
-    ax.set_xlim(x_fine[0], x_fine[-1])
     ax.set_ylim(0, solar_constant * 1.05)
     ax.set_xticks(tick_indices)
     ax.set_xticklabels([utc_times[i] for i in tick_indices], rotation=30, ha='right', fontsize=8)
@@ -1083,7 +1092,7 @@ def select_parameters():
     unchanged and skipped in the prompts.
     """
     global BLOCKEE, BLOCKERS, OBSERVER, MODE, PRESENTATION, UTC
-    global POINT, CALCULATE_ILLUMINATION, HALF_MOON
+    global POINT, CALCULATE_ILLUMINATION, ONLY_VISIBLE_SURFACE
     global RESOLUTION, TIME_FRAME, TIME_STEP
     global LAT_DEG, LON_DEG, LAT_OFFSET, LON_OFFSET, LAT_PORTION, LON_PORTION
 
@@ -1115,7 +1124,7 @@ def select_parameters():
                          default="Earth", exclude=[BLOCKEE])
         
     if not UTC:
-        UTC = _ask_utc("UTC start time", UTC)
+        UTC = _ask_utc("UTC Time of event", UTC)
 
     # ── Point ───────────────────────────────────────────────────────────────
     _section("Point-tracking mode")
@@ -1139,9 +1148,9 @@ def select_parameters():
         print("\nNote: Calculating illumination will include calculations of solar incidence angle effects but may slow down the simulation.")
         CALCULATE_ILLUMINATION = _ask_bool("Calculate illumination  (better lighting, slower)", True)
     if PRESENTATION == "Circle":
-        HALF_MOON = True
-    if HALF_MOON is None and not POINT:
-        HALF_MOON = _ask_bool("Show only half moon", True)
+        ONLY_VISIBLE_SURFACE = True
+    if ONLY_VISIBLE_SURFACE is None and not POINT:
+        ONLY_VISIBLE_SURFACE = _ask_bool("Model only the surface facing the observer? (Selecting 'No' models the entire body, including the backside)", True)
 
     # ── fidelity ──────────────────────────────────────────────────────────────
     _section("Simulation fidelity")
@@ -1177,7 +1186,7 @@ def select_parameters():
     if LAT_PORTION is None and not POINT:
         LAT_PORTION = _ask_float("Latitude zoom  (>1 = zoom in)", 1, 200, 1.0)
     if LON_PORTION is None and not POINT:
-        lon_default = 1 + int(HALF_MOON)
+        lon_default = 1 + int(ONLY_VISIBLE_SURFACE)
         LON_PORTION = _ask_float("Longitude zoom (>1 = zoom in)", 1, 200, lon_default)
 
     # ── summary ───────────────────────────────────────────────────────────────
@@ -1189,7 +1198,7 @@ def select_parameters():
         UTC=UTC,
         MODE=MODE, PRESENTATION=PRESENTATION,
         POINT=POINT, CALCULATE_ILLUMINATION=CALCULATE_ILLUMINATION,
-        HALF_MOON=HALF_MOON,
+        ONLY_VISIBLE_SURFACE=ONLY_VISIBLE_SURFACE,
         RESOLUTION=RESOLUTION, TIME_FRAME=TIME_FRAME, TIME_STEP=TIME_STEP,
         LAT_DEG=LAT_DEG, LON_DEG=LON_DEG,
         LAT_OFFSET=LAT_OFFSET, LON_OFFSET=LON_OFFSET,
