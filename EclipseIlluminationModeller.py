@@ -24,7 +24,21 @@
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
 USE_ASSIGNED_CONFIG = False
 
+""" Current errors and phenomena not handled by the model:
+Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
 
+Does not take into account limb darkening
+
+Surface points are only calculated once, so if observer perspective shifts alot during time frame,
+the points seen at the ends of the time frame are not accurate. 
+In essence, only the middle frame is accurate. 
+
+Subobserver longitude and latitude division is not correct. 
+If the observer is far from the ecliptic plane, the half of the object facing the observer is not correctly modeled.
+Essentially visualisation work best for observers near the ecliptic plane.
+"""
+
+# region Initial setup: dependency check, kernel furnishing and global inits
 import importlib
 import subprocess
 import sys
@@ -103,24 +117,6 @@ def furnish_kernels() -> None:
 
 furnish_kernels()
 
-
-# region Current errors:
-# Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
-
-# Does not take into account limb darkening
-
-# Surface points are only calculated once, so if observer perspective shifts alot during time frame,
-# the points seen at the ends of the time frame are not accurate. 
-# In essence, only the middle frame is accurate. 
-
-# Subobserver longitude and latitude division is not correct. 
-# If the observer is far from the ecliptic plane, the half of the object facing the observer is not correctly modeled.
-# Essentially visualisation work best for observers near the ecliptic plane.
-
-# endregion 
-
-# region forced global inits
-#── defaults ──────────────────────────────────────────────────────────────────
 BLOCKEE       = ""
 BLOCKERS      = []
 OBSERVER      = ""
@@ -141,6 +137,7 @@ LAT_PORTION            = None
 LON_PORTION            = None
 ABCORR        = "LT+S"
 # endregion
+
 
 if USE_ASSIGNED_CONFIG:
     # region Spacetime Presets:
@@ -183,8 +180,8 @@ if USE_ASSIGNED_CONFIG:
     # endregion
 
     # region MAIN CONFIGURATION:
-    # Available ouput modes: Still, Slider, Animation
-    # Available Presentation ways: 2D, Dots, Surface
+    # Available time handling modes: Still, Slider, Animation
+    # Available Presentation ways: Circle, Mercator, Dots, Sphere
     MODE = "Slider"
     PRESENTATION = "Surface"
 
@@ -258,12 +255,14 @@ def main() -> None:
     
     if POINT:
         graph_point(blocking_total, moments, solar_constant)
-    elif PRESENTATION == "2D":
-        graph_2d(longitudes, latitudes, srf_points, blocking_total, moments, solar_constant, norm_sub_obs_vec)
+    elif PRESENTATION == "Circle":
+        graph_2D_circle(longitudes, latitudes, srf_points, blocking_total, moments, solar_constant, norm_sub_obs_vec)
+    elif PRESENTATION == "Mercator":
+        graph_2D_mercator(longitudes, latitudes, blocking_total, moments, solar_constant)
     elif PRESENTATION == "Dots":
         visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat)
-    elif PRESENTATION == "Surface":
-        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
+    elif PRESENTATION == "Sphere":
+        visualize_3D_sphere(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
 
 
 
@@ -405,7 +404,7 @@ def create_pos_array(et: int,
 
     sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION+2)[1:-1] # no poles
     latitudes = np.arcsin(sin_latitudes)
-
+    
     longitudes = np.linspace(start_lonlat[0]+LON_OFFSET-np.pi/LON_PORTION, start_lonlat[0]+LON_OFFSET+np.pi/LON_PORTION, RESOLUTION)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
@@ -509,6 +508,7 @@ _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
                  wrap=True, linespacing=1.8, transform=None)  # transform set per-fig
 # endregion
 
+# region ── Shared visualisation helpers ───────────────────────────────────────────────
 def _make_title_str(moment: float) -> str:
     return (f"Blockee: {BLOCKEE}\n"
             f"Blockers: {',\n'.join(BLOCKERS)}\n"
@@ -530,10 +530,10 @@ def _add_slider(fig, n_frames: int):
     slider = Slider(slider_ax, "Time step", 0, n_frames - 1,
                     valinit=0, valstep=1)
     return slider
+# endregion
 
 
-
-def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
+def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          srf_points: np.ndarray[np.ndarray[np.float64]],
                          moments: list[float],
                          solar_constant,
@@ -541,8 +541,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          latitudes: np.ndarray[np.float64],
                          start_lonlat: tuple[float, float]):
     '''
-    Plots part of the surface in 3D, with illumination
-    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, OBSERVER, MODE
+    Plots part of the surface as a sphere in 3D, with illumination
     
     Args:
         blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
@@ -668,7 +667,6 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                       start_lonlat: tuple[float, float]):
     '''
     Visualizes solar eclipse fractions on a planetoid surface.
-    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, OBSERVER, MODE
     
     Args:
         blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
@@ -745,7 +743,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
 
 
-def graph_2d(longitudes: np.ndarray[np.float64],
+def graph_2D_circle(longitudes: np.ndarray[np.float64],
              latitudes: np.ndarray[np.float64],
              srf_points: np.ndarray[np.ndarray[np.float64]],
              blocked_data: np.ndarray[np.ndarray[np.float64]],
@@ -754,7 +752,6 @@ def graph_2d(longitudes: np.ndarray[np.float64],
              obs_to_body_vec: np.ndarray[np.float64]):
     '''
     Plots the 2D surface of the entire body, with illumination
-    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, OBSERVER, MODE
 
     Args:
         longitudes (np.ndarray):                            Array of longitudes for the surface points.
@@ -837,12 +834,85 @@ def graph_2d(longitudes: np.ndarray[np.float64],
 
 
 
+def graph_2D_mercator(longitudes: np.ndarray[np.float64],
+                      latitudes: np.ndarray[np.float64],
+                      blocked_data: np.ndarray[np.ndarray[np.float64]],
+                      moments: list[int],
+                      solar_constant: float):
+    '''
+    Plots the 2D surface of the entire body as a mercator projection, with illumination
+
+    Args:
+        longitudes (np.ndarray[np.float64]):                list of longitudes
+        latitudes (np.ndarray[np.float64]):                 list of latitudes
+        blocked_data (np.ndarray[np.ndarray[np.float64]]):  List of blocked data for the points and the moments
+        moments (list[int]):                                List of times which should be plotted
+        solar_constant (float):                             The solar irradiance at the body and average time
+    '''
+    #_PLOT_RECT_MERC   = [0.18, 0.18, 0.60, 0.74]
+    #_SLIDER_RECT_MERC = [0.18, 0.06, 0.60, 0.03]
+
+    n_lat = len(latitudes)
+    n_lon = len(longitudes)
+    illumination = np.array((1 - blocked_data) * solar_constant)
+    initial = illumination[0] if illumination.ndim == 2 else illumination
+
+    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H))
+    fig.subplots_adjust(left=_PLOT_RECT[0],  bottom=_PLOT_RECT[1],
+                        right=_PLOT_RECT[0] + _PLOT_RECT[2],
+                        top=_PLOT_RECT[1]   + _PLOT_RECT[3])
+
+    img = ax.pcolormesh(
+        np.degrees(longitudes), np.degrees(latitudes),
+        initial.reshape(n_lat, n_lon),
+        cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+    )
+    ax.set_xlabel("Longitude (°)")
+    ax.set_ylabel("Latitude (°)")
+    ax.set_aspect('equal', adjustable='box')
+
+    _add_colorbar(fig, img, solar_constant)
+
+    title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
+                     **{**_TITLE_KW, 'transform': fig.transFigure})
+
+    match MODE:
+        case "Still":
+            pass
+
+        case "Slider":
+            slider_ax = fig.add_axes(_SLIDER_RECT)
+            slider = Slider(slider_ax, "Time step", 0, len(moments) - 1,
+                            valinit=0, valstep=1)
+
+            def update_slider(val):
+                idx = int(slider.val)
+                img.set_array(illumination[idx].reshape(n_lat, n_lon).ravel())
+                title.set_text(_make_title_str(moments[idx]))
+                fig.canvas.draw_idle()
+
+            slider.on_changed(update_slider)
+            fig.slider = slider
+
+        case "Animation":
+            def update(frame):
+                img.set_array(illumination[frame].reshape(n_lat, n_lon).ravel())
+                title.set_text(_make_title_str(moments[frame]))
+                return img, title
+
+            ani = FuncAnimation(fig, update, frames=len(moments),
+                                interval=100, blit=False)
+            fig.ani = ani
+
+    plt.show()
+
+
+
 def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
                 moments: list[int],
                 solar_constant: float):
     '''
     Plots illumination over time for a single tracked surface point.
-    DEPENDS ON GLOBALS BLOCKEE, LON_DEG, LAT_DEG, MODE
     
     Args:
         blocked_data (np.ndarray[np.ndarray[np.float64]]):  2D array of blocked fractions for every moment.
@@ -905,7 +975,7 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
     plt.show()
 
 
-# region── helpers ───────────────────────────────────────────────────────────────────
+# region ── helpers selection ───────────────────────────────────────────────────────────────────
 def _ask(prompt: str, validator, default=None, hint: str = ""):
     """Loop until the user gives a valid answer (or accepts the default)."""
     while True:
@@ -1020,7 +1090,7 @@ def select_parameters():
     BODIES    = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
     OBSERVERS = BODIES + ["Sun", "Earth", "Moon", "HST"]
     MODES     = ["Still", "Slider", "Animation"]
-    PRESENTS  = ["2D", "Dots", "Surface"]
+    PRESENTS  = ["Circle", "Mercator", "Dots", "Sphere"]
 
     print("\n╔══════════════════════════════════════╗")
     print("║   Simulation parameter setup         ║")
@@ -1068,6 +1138,8 @@ def select_parameters():
     if CALCULATE_ILLUMINATION is None:
         print("\nNote: Calculating illumination will include calculations of solar incidence angle effects but may slow down the simulation.")
         CALCULATE_ILLUMINATION = _ask_bool("Calculate illumination  (better lighting, slower)", True)
+    if PRESENTATION == "Circle":
+        HALF_MOON = True
     if HALF_MOON is None and not POINT:
         HALF_MOON = _ask_bool("Show only half moon", True)
 
