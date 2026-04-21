@@ -142,16 +142,19 @@ ABCORR        = "LT+S"
 if MANUAL_SELECTION:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
-    UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
+    #UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
 
     # Jupiter eclipsed by Io
     #UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
 
     # Triple shadow transit
-    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 07:09:19", "Jupiter", ['Io', 'Europa', 'Ganymede', 'Callisto', 'Jupiter'] 
+    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:08:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
+
+    # Io eclipsed by Callisto
+    UTC, BLOCKEE, BLOCKERS = "2021 Apr 20 15:55:38", "Io", ['Callisto']
     # endregion
 
     # region Evaluation times (Ignore):
@@ -181,18 +184,18 @@ if MANUAL_SELECTION:
 
     # region MAIN CONFIGURATION:
     # Available time handling modes: Still, Slider, Animation
-    # Available Presentation ways: Circle, Mercator, Dots, Sphere
+    # Available Presentation ways: Circle, Rectangle, Dots, Surface
     MODE = "Slider"
-    PRESENTATION = "Sphere"
+    PRESENTATION = "Circle"
 
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
     CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
-    ONLY_VISIBLE_SURFACE = True     # Chooses if only half the blockee should be shown (as seen from the observer)
+    ONLY_VISIBLE_SURFACE = True    # Chooses if only half the blockee should be shown (as seen from the observer)
 
     #Simulation Fidelity:
     RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
-    TIME_FRAME = 1000 # The time in seconds that the animation includes, back and forth
+    TIME_FRAME = 100 # The time in seconds that the animation includes, back and forth
     TIME_STEP = 100     # The time in seconds that each step moves forward with
     # endregion
 
@@ -257,12 +260,12 @@ def main() -> None:
         graph_point(blocking_total, moments, solar_constant)
     elif PRESENTATION == "Circle":
         graph_2D_circle(longitudes, latitudes, srf_points, blocking_total, moments, solar_constant, norm_sub_obs_vec)
-    elif PRESENTATION == "Mercator":
-        graph_2D_mercator(longitudes, latitudes, blocking_total, moments, solar_constant)
+    elif PRESENTATION == "Rectangle":
+        graph_2D_rectangle(longitudes, latitudes, blocking_total, moments, solar_constant)
     elif PRESENTATION == "Dots":
         visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat)
-    elif PRESENTATION == "Sphere":
-        visualize_3D_sphere(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
+    elif PRESENTATION == "Surface":
+        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
 
 
 
@@ -505,7 +508,7 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
 
 # region ── Shared visualisation layout ───────────────────────────────────────────────
 _FIG_W, _FIG_H   = 14, 9
-_PLOT_BOX        = [0, 0.0, 1.0, 1.0, 0, 0.1]   # [left, bottom, right, top, wmargin, hmargin]
+_PLOT_BOX        = [-0.2, -0.1, 1.2, 1.1, 0, 0.1]   # [left, bottom, right, top, wmargin, hmargin]
 _PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
 _CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
 _SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
@@ -542,7 +545,7 @@ def _add_slider(fig, n_frames: int):
 # endregion
 
 
-def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
+def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          srf_points: np.ndarray[np.ndarray[np.float64]],
                          moments: list[float],
                          solar_constant,
@@ -550,7 +553,7 @@ def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          latitudes: np.ndarray[np.float64],
                          start_lonlat: tuple[float, float]):
     '''
-    Plots part of the surface as a sphere in 3D, with illumination
+    Plots part of the surface as a surface in 3D
     
     Args:
         blocked_data (np.ndarray):  For 'Still': 1D array of fractions. For 'Slider'/'Animation': 2D array (time_steps, srf_points).
@@ -613,6 +616,10 @@ def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
     # ── figure ────────────────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), subplot_kw={"projection": "3d"})   
     ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)'); ax.set_zlabel('Z (km)')
+    fig.subplots_adjust(left=_PLOT_BOX[0], bottom=_PLOT_BOX[1],
+                        right=_PLOT_BOX[2], top=_PLOT_BOX[3], 
+                        wspace=_PLOT_BOX[4], hspace=_PLOT_BOX[5])
+    
 
     # Colorbar — fake ScalarMappable so colorbar works with manual facecolors
     sm = plt.cm.ScalarMappable(cmap='gray',
@@ -682,13 +689,10 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     z = np.array([p[2] for p in srf_points])
 
     # ── figure ────────────────────────────────────────────────────────────────
-    #fig = plt.figure(figsize=(_FIG_W, _FIG_H))
-    #ax  = fig.add_axes(_PLOT_RECT, projection='3d')
-
     fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), subplot_kw={'projection': '3d'})
-    #fig.subplots_adjust(left=_PLOT_BOX[0], bottom=_PLOT_BOX[1],
-    #                    right=_PLOT_BOX[2], top=_PLOT_BOX[3], 
-    #                    wspace=_PLOT_BOX[4], hspace=_PLOT_BOX[5])
+    fig.subplots_adjust(left=_PLOT_BOX[0], bottom=_PLOT_BOX[1],
+                        right=_PLOT_BOX[2], top=_PLOT_BOX[3], 
+                        wspace=_PLOT_BOX[4], hspace=_PLOT_BOX[5])
     
     ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)'); ax.set_zlabel('Z (km)')
 
@@ -831,13 +835,13 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
 
 
 
-def graph_2D_mercator(longitudes: np.ndarray[np.float64],
+def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
                       latitudes: np.ndarray[np.float64],
                       blocked_data: np.ndarray[np.ndarray[np.float64]],
                       moments: list[int],
                       solar_constant: float):
     '''
-    Plots the 2D surface of the entire body as a mercator projection, with illumination
+    Plots the 2D surface of the entire body as a equirectangular map
 
     Args:
         longitudes (np.ndarray[np.float64]):                list of longitudes
@@ -860,7 +864,7 @@ def graph_2D_mercator(longitudes: np.ndarray[np.float64],
     img = ax.pcolormesh(
         np.degrees(longitudes), np.degrees(latitudes),
         initial.reshape(n_lat, n_lon),
-        cmap="plasma", shading="auto", vmin=0, vmax=solar_constant,
+        cmap="gray", shading="auto", vmin=0, vmax=solar_constant,
     )
     ax.set_xlabel("Longitude (°)")
     ax.set_ylabel("Latitude (°)")
@@ -945,20 +949,20 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
     # Tick positions and labels (show ~10 evenly spaced)
     tick_indices = np.linspace(0, len(moments) - 1, min(10, len(moments)), dtype=int)
 
-    scatter = ax.scatter(x_numeric, illumination, color='white', s=20, zorder=3)
+    scatter = ax.scatter(x_numeric, illumination, color='black', s=20, zorder=3)
     cursor = mplcursors.cursor(scatter, hover=True)
     ax.set_ylim(0, solar_constant * 1.05)
     ax.set_xticks(tick_indices)
     ax.set_xticklabels([utc_times[i] for i in tick_indices], rotation=30, ha='right', fontsize=8)
     ax.set_ylabel('Illumination (W/m²)')
     ax.set_title(f"{BLOCKEE} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
-    ax.set_facecolor('black')
-    fig.patch.set_facecolor('black')
-    ax.tick_params(colors='white')
-    ax.yaxis.label.set_color('white')
-    ax.title.set_color('white')
-    for spine in ax.spines.values():
-        spine.set_edgecolor('white')
+    #ax.set_facecolor('black')
+    #fig.patch.set_facecolor('black')
+    #ax.tick_params(colors='white')
+    #ax.yaxis.label.set_color('white')
+    #ax.title.set_color('white')
+    #for spine in ax.spines.values():
+    #    spine.set_edgecolor('white')
 
     @cursor.connect("add")
     def on_add(sel):
@@ -966,8 +970,8 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
         sel.annotation.set_text(
             f"{utc_times[idx]}\n{illumination[idx]:.2f} W/m²"
         )
-        sel.annotation.get_bbox_patch().set(fc="black", alpha=0.8)
-        sel.annotation.set_color("white")
+        #sel.annotation.get_bbox_patch().set(fc="black", alpha=0.8)
+        #sel.annotation.set_color("white")
 
     plt.tight_layout()
     plt.show()
@@ -1088,7 +1092,7 @@ def select_parameters():
     BODIES    = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
     OBSERVERS = BODIES + ["Sun", "Earth", "Moon", "HST"]
     MODES     = ["Still", "Slider", "Animation"]
-    PRESENTS  = ["Circle", "Mercator", "Dots", "Sphere"]
+    PRESENTS  = ["Circle", "Rectangle", "Dots", "Surface"]
 
     print("\n╔══════════════════════════════════════╗")
     print("║   Simulation parameter setup         ║")
