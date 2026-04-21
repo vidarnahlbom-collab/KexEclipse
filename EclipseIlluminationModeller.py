@@ -505,6 +505,7 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
 
 # region ── Shared visualisation layout ───────────────────────────────────────────────
 _FIG_W, _FIG_H   = 14, 9
+_PLOT_BOX        = [0, 0.0, 1.0, 1.0, 0, 0.1]   # [left, bottom, right, top, wmargin, hmargin]
 _PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
 _CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
 _SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
@@ -650,8 +651,8 @@ def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
                             interval=50, blit=False, repeat=True)
             # Attach to fig to keep reference alive
             fig.ani = ani
-                       
-    ax.set_aspect('equal')
+                    
+    ax.set_aspect('equal', adjustable='box')
 
     ax.view_init(elev=np.degrees(start_lonlat[1]), azim=np.degrees(start_lonlat[0]))
 
@@ -684,6 +685,12 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     # ── figure ────────────────────────────────────────────────────────────────
     fig = plt.figure(figsize=(_FIG_W, _FIG_H))
     ax  = fig.add_axes(_PLOT_RECT, projection='3d')
+
+    #    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), subplot_kw={'projection': '3d'})
+    #fig.subplots_adjust(left=_PLOT_BOX[0], bottom=_PLOT_BOX[1],
+    #                    right=_PLOT_BOX[2], top=_PLOT_BOX[3], 
+    #                    wspace=_PLOT_BOX[4], hspace=_PLOT_BOX[5])
+    
     ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)'); ax.set_zlabel('Z (km)')
 
     sm = plt.cm.ScalarMappable(cmap='gray',
@@ -726,7 +733,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                                 interval=100, blit=False)
             fig.ani = ani
         
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='box')
 
     ax.view_init(elev=np.degrees(start_lonlat[1]), azim=np.degrees(start_lonlat[0]))
 
@@ -820,7 +827,7 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
             fig.ani = ani
         
     #ax.set_aspect('equal', adjustable='box')
-    #plt.tight_layout()
+
     plt.show()
 
 
@@ -840,8 +847,6 @@ def graph_2D_mercator(longitudes: np.ndarray[np.float64],
         moments (list[int]):                                List of times which should be plotted
         solar_constant (float):                             The solar irradiance at the body and average time
     '''
-    #_PLOT_RECT_MERC   = [0.18, 0.18, 0.60, 0.74]
-    #_SLIDER_RECT_MERC = [0.18, 0.06, 0.60, 0.03]
 
     n_lat = len(latitudes)
     n_lon = len(longitudes)
