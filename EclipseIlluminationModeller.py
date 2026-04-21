@@ -183,7 +183,7 @@ if MANUAL_SELECTION:
     # Available time handling modes: Still, Slider, Animation
     # Available Presentation ways: Circle, Mercator, Dots, Sphere
     MODE = "Slider"
-    PRESENTATION = "Surface"
+    PRESENTATION = "Sphere"
 
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
@@ -611,8 +611,7 @@ def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
     Zs = r * np.cos(v)
 
     # ── figure ────────────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(_FIG_W, _FIG_H))
-    ax  = fig.add_axes(_PLOT_RECT, projection='3d')
+    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), subplot_kw={"projection": "3d"})   
     ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)'); ax.set_zlabel('Z (km)')
 
     # Colorbar — fake ScalarMappable so colorbar works with manual facecolors
