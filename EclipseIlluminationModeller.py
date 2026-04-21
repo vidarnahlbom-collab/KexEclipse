@@ -516,10 +516,12 @@ _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
 
 # region ── Shared visualisation helpers ───────────────────────────────────────────────
 def _make_title_str(moment: float) -> str:
+    utc = spice.et2utc(moment, 'C', 0)
     return (f"Blockee: {BLOCKEE}\n"
             f"Blockers: {',\n'.join(BLOCKERS)}\n"
             f"Observer: {OBSERVER}\n"
-            f"UTC: {spice.et2utc(moment, 'C', 0)}")
+            #f"UTC: {spice.et2utc(moment, 'C', 0)}")
+            f"UTC: {utc[:11]}\n  {utc[11:]}")
 
 
 def _add_colorbar(fig, mappable, solar_constant: float):
@@ -648,17 +650,8 @@ def visualize_3D_sphere(blocked_data: np.ndarray[np.ndarray[np.float64]],
                             interval=50, blit=False, repeat=True)
             # Attach to fig to keep reference alive
             fig.ani = ani
-                    
-        
-    x_limits = ax.get_xlim3d()
-    y_limits = ax.get_ylim3d()
-    z_limits = ax.get_zlim3d()
-
-    x_range = abs(x_limits[1] - x_limits[0])
-    y_range = abs(y_limits[1] - y_limits[0])
-    z_range = abs(z_limits[1] - z_limits[0])
-
-    ax.set_box_aspect([x_range, y_range, z_range])
+                       
+    ax.set_aspect('equal')
 
     ax.view_init(elev=np.degrees(start_lonlat[1]), azim=np.degrees(start_lonlat[0]))
 
@@ -733,15 +726,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                                 interval=100, blit=False)
             fig.ani = ani
         
-    x_limits = ax.get_xlim3d()
-    y_limits = ax.get_ylim3d()
-    z_limits = ax.get_zlim3d()
-
-    x_range = abs(x_limits[1] - x_limits[0])
-    y_range = abs(y_limits[1] - y_limits[0])
-    z_range = abs(z_limits[1] - z_limits[0])
-
-    ax.set_box_aspect([x_range, y_range, z_range])
+    ax.set_aspect('equal')
 
     ax.view_init(elev=np.degrees(start_lonlat[1]), azim=np.degrees(start_lonlat[0]))
 
