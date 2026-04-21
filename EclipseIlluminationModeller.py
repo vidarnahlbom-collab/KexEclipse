@@ -682,10 +682,10 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     z = np.array([p[2] for p in srf_points])
 
     # ── figure ────────────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(_FIG_W, _FIG_H))
-    ax  = fig.add_axes(_PLOT_RECT, projection='3d')
+    #fig = plt.figure(figsize=(_FIG_W, _FIG_H))
+    #ax  = fig.add_axes(_PLOT_RECT, projection='3d')
 
-    #    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), subplot_kw={'projection': '3d'})
+    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), subplot_kw={'projection': '3d'})
     #fig.subplots_adjust(left=_PLOT_BOX[0], bottom=_PLOT_BOX[1],
     #                    right=_PLOT_BOX[2], top=_PLOT_BOX[3], 
     #                    wspace=_PLOT_BOX[4], hspace=_PLOT_BOX[5])
