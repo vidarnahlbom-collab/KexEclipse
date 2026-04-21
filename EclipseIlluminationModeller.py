@@ -148,13 +148,13 @@ if MANUAL_SELECTION:
     #UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
 
     # Triple shadow transit
-    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:08:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
+    UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:45:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
 
     # Io eclipsed by Callisto
-    UTC, BLOCKEE, BLOCKERS = "2021 Apr 20 15:55:38", "Io", ['Callisto']
+    #UTC, BLOCKEE, BLOCKERS = "2021 Apr 20 15:55:38", "Io", ['Callisto']
     # endregion
 
     # region Evaluation times (Ignore):
@@ -405,16 +405,24 @@ def create_pos_array(et: int,
     lat_min = np.clip(lat_center - np.pi/(2*LAT_PORTION), -np.pi/2, np.pi/2)
     lat_max = np.clip(lat_center + np.pi/(2*LAT_PORTION), -np.pi/2, np.pi/2)
 
+    lat_span = lat_max - lat_min
+    lon_span = (2 * np.pi) / LON_PORTION
+
+    density = RESOLUTION / np.pi
+
+    n_lat = max(2, int(lat_span * density))
+    n_lon = max(2, int(lon_span * density))
+
     # If the entire occluded body is to be modeled, we also include the poles.
     # If only the part facing the observer is to be modeled, we remove the poles
     if ONLY_VISIBLE_SURFACE:
-        sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION+2)[1:-1] # no poles
+        sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), n_lat+2)[1:-1] # no poles
         latitudes = np.arcsin(sin_latitudes)
     else: 
-        sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), RESOLUTION)
+        sin_latitudes = np.linspace(np.sin(lat_min), np.sin(lat_max), n_lat)
         latitudes = np.arcsin(sin_latitudes) 
     
-    longitudes = np.linspace(start_lonlat[0]+LON_OFFSET-np.pi/LON_PORTION, start_lonlat[0]+LON_OFFSET+np.pi/LON_PORTION, RESOLUTION)
+    longitudes = np.linspace(start_lonlat[0]+LON_OFFSET-np.pi/LON_PORTION, start_lonlat[0]+LON_OFFSET+np.pi/LON_PORTION, n_lon)
 
     # Spice.latsrf wants lonlat (Sequence[Sequence[float]]) – Array of longitude/latitude coordinate pairs.
     # So we convert it. We want every lon coordinate to be combined with every lat, so we get N^2 total points. 
@@ -792,7 +800,7 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
                         top=_PLOT_RECT[1]+_PLOT_RECT[3])
 
     img = ax.pcolormesh(u_grid, v_grid, make_image(initial),
-                        cmap='gray', vmin=0, vmax=solar_constant, shading='auto')
+                        cmap='gray', vmin=0, vmax=solar_constant, shading='nearest')
     ax.set_facecolor('darkblue')
     ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)')
     ax.set_aspect('equal', adjustable='box')
