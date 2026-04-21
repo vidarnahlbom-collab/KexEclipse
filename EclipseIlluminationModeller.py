@@ -826,7 +826,7 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
                                 interval=100, blit=False)
             fig.ani = ani
         
-    #ax.set_aspect('equal', adjustable='box')
+    ax.set_aspect('equal', adjustable='box')
 
     plt.show()
 
