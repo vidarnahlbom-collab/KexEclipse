@@ -136,6 +136,7 @@ LON_OFFSET             = None
 LAT_PORTION            = None
 LON_PORTION            = None
 ABCORR        = "LT+S"
+ANIM_SPEED = None
 # endregion
 
 
@@ -187,7 +188,6 @@ if MANUAL_SELECTION:
     # Available Presentation ways: Circle, Rectangle, Dots, Surface
     MODE = "Slider"
     PRESENTATION = "Circle"
-
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
     CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
@@ -195,8 +195,8 @@ if MANUAL_SELECTION:
 
     #Simulation Fidelity:
     RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
-    TIME_FRAME = 100 # The time in seconds that the animation includes, back and forth
-    TIME_STEP = 100     # The time in seconds that each step moves forward with
+    TIME_FRAME = 1000 # The time in seconds that the animation includes, back and forth
+    TIME_STEP = 1000     # The time in seconds that each step moves forward with
     # endregion
 
     # region Coordinates for Point tracking mode
@@ -213,6 +213,7 @@ if MANUAL_SELECTION:
 
     # region Other options:
     ABCORR = "LT+S"
+    ANIM_SPEED = 500 # Milliseconds between frames of animation
     # endregion
 
 
@@ -593,16 +594,6 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         # Note: We flatten it to a long list of colors
         return np.column_stack([fc.ravel(), fc.ravel(), fc.ravel(), np.ones(fc.size)])
 
-    def update(frame):
-        idx = int(frame)
-        # 1. Update colors (Optimized: uses flattened array)
-        surf.set_facecolor(all_facecolors[idx])
-        # 2. Update title
-        title.set_text(_make_title_str(moments[idx]))
-        # 3. Force draw (draw_idle is better for interactivity)
-        fig.canvas.draw_idle()
-        return surf, title
-
     # ── geometry ──────────────────────────────────────────────────────────────
     # create the surface:
     x = np.array([p[0] for p in srf_points])
@@ -647,7 +638,52 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     # Initial surface
     surf = ax.plot_surface(Xs, Ys, Zs, facecolors=initial_facecolor,
                            shade=False, edgecolor='none', linewidth=0, antialiased=False,
-                           rcount=len(latitudes), ccount=len(longitudes))
+                           rcount=len(latitudes), ccount=len(longitudes),
+                           picker=True)
+    
+
+    # -- Cursor ---
+    current_frame = [0]
+    # readout = fig.text(0.02, 0.02, "", fontsize=10, va='bottom')
+    # def on_pick(event):
+    #     if MODE == "Still":
+    #         idx = 0
+    #     elif MODE == "Slider":
+    #         idx = int(fig.slider.val)
+    #     elif MODE == "Animation":
+    #         idx = current_frame[0]
+
+    #     # Surface ind indexes into the (lat-1)*(lon-1) face grid
+    #     ind = event.ind[0]
+    #     n_faces_lon = len(longitudes) - 1
+    #     row = ind // n_faces_lon
+    #     col = ind  % n_faces_lon
+
+    #     # Face center = average of 4 corners
+    #     lat_c = (latitudes[row]  + latitudes[row+1])  / 2
+    #     lon_c = (longitudes[col] + longitudes[col+1]) / 2
+
+    #     # Reconstruct XYZ for reclat
+    #     v_c = np.pi/2 - lat_c
+    #     px = r * np.cos(lon_c) * np.sin(v_c)
+    #     py = r * np.sin(lon_c) * np.sin(v_c)
+    #     pz = r * np.cos(v_c)
+
+    #     # Find closest srf_point for illumination value
+    #     face_xyz = np.array([px, py, pz])
+    #     srf_flat = np.stack([x, y, z], axis=1)
+    #     closest = np.argmin(np.linalg.norm(srf_flat - face_xyz, axis=1))
+    #     val = (1 - (blocked_data[idx] if blocked_data.ndim == 2 else blocked_data))[closest] * solar_constant
+
+    #     _, lon_sp, lat_sp = spice.reclat([px, py, pz])
+    #     readout.set_text(
+    #         f"{val:.1f} W/m²  |  "
+    #         f"Lon: {np.degrees(lon_sp):.1f}°  "
+    #         f"Lat: {np.degrees(lat_sp):.1f}°"
+    #     )
+    #     fig.canvas.draw_idle()
+
+    # fig.canvas.mpl_connect("pick_event", on_pick)
     
     # ── mode ──────────────────────────────────────────────────────────────────
     match MODE:
@@ -662,9 +698,20 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         case "Animation":
             # blit=False is mandatory for 3D rotation to work while animating
             ani = FuncAnimation(fig, update, frames=len(moments), 
-                            interval=50, blit=False, repeat=True)
+                            interval=ANIM_SPEED, blit=False, repeat=True)
             # Attach to fig to keep reference alive
             fig.ani = ani
+        
+    def update(frame):
+        current_frame[0] = frame
+        idx = int(frame)
+        # 1. Update colors (Optimized: uses flattened array)
+        surf.set_facecolor(all_facecolors[idx])
+        # 2. Update title
+        title.set_text(_make_title_str(moments[idx]))
+        # 3. Force draw (draw_idle is better for interactivity)
+        fig.canvas.draw_idle()
+        return surf, title
                     
     ax.set_aspect('equal', adjustable='box')
 
@@ -712,13 +759,36 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
                      **{**_TITLE_KW, 'transform': fig.transFigure})
 
+    # -- Cursor ---
+    current_frame = [0]
+    readout = fig.text(0.02, 0.02, "", fontsize=10, va='bottom')
+    def on_pick(event):
+        if MODE == "Still":
+            idx = 0
+        elif MODE == "Slider":
+            idx = int(fig.slider.val)
+        elif MODE == "Animation":
+            idx = current_frame[0]
+
+        ind = event.ind[0]
+        val = (1 - (blocked_data[idx] if blocked_data.ndim == 2 else blocked_data))[ind] * solar_constant
+
+        _, lon_sp, lat_sp = spice.reclat([x[ind], y[ind], z[ind]])
+        readout.set_text(
+            f"{val:.1f} W/m²  |  "
+            f"Lon: {np.degrees(lon_sp):.1f}°  "
+            f"Lat: {np.degrees(lat_sp):.1f}°"
+        )
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect("pick_event", on_pick)
     # ── mode ──────────────────────────────────────────────────────────────────
     match MODE:
         case "Still":
-            ax.scatter(x, y, z, c=make_colors(blocked_data), s=20)            
+            ax.scatter(x, y, z, c=make_colors(blocked_data), s=20, picker=True, pickradius=5)
 
         case "Slider":
-            scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
+            scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20, picker=True, pickradius=5)
             slider  = _add_slider(fig, len(moments))
 
             def update_slider(val):
@@ -733,15 +803,16 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
             slider.on_changed(update_slider)
 
         case "Animation":
-            scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20)
+            scatter = ax.scatter(x, y, z, c=make_colors(blocked_data[0]), s=20, picker=True, pickradius=5)
 
             def update_animation(frame):
+                current_frame[0] = frame
                 scatter.set_color(make_colors(blocked_data[frame]))
                 title.set_text(_make_title_str(moments[frame]))
                 return scatter,
 
             ani = FuncAnimation(fig, update_animation, frames=len(blocked_data),
-                                interval=100, blit=False)
+                                interval=ANIM_SPEED, blit=False)
             fig.ani = ani
         
     ax.set_aspect('equal', adjustable='box')
@@ -809,6 +880,44 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
 
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
                      **{**_TITLE_KW, 'transform': fig.transFigure})
+    
+    # -- Cursor -----
+    n_lat = len(latitudes)
+    n_lon = len(longitudes)
+    annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points",
+                        bbox=dict(boxstyle="round", fc="white", alpha=0.8))
+    annot.set_visible(False)
+    current_frame = [0]  # list so it's mutable from nested functions
+    def on_move(event):
+        if event.inaxes != ax:
+            annot.set_visible(False)
+            fig.canvas.draw_idle()
+            return
+
+        # Find closest surface point in projected space
+        dist = (u_coords - event.xdata)**2 + (v_coords - event.ydata)**2
+        ind = np.argmin(dist)
+
+        if MODE == "Slider":
+            idx = int(slider.val)
+        elif MODE == "Animation":
+            idx = current_frame[0]
+        else:
+            idx = 0
+
+        val = illumination[idx][ind] if illumination.ndim == 2 else illumination[ind]
+
+        # Convert flat index back to lat/lon
+        row, col = np.unravel_index(ind, (n_lat, n_lon))
+        lon_deg = np.degrees(longitudes[col])
+        lat_deg = np.degrees(latitudes[row])
+
+        annot.xy = (event.xdata, event.ydata)
+        annot.set_text(f"{val:.1f} W/m²\nLon: {lon_deg:.1f}°\nLat: {lat_deg:.1f}°")
+        annot.set_visible(True)
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect("motion_notify_event", on_move)
 
     # ── mode ──────────────────────────────────────────────────────────────────
     match MODE:
@@ -829,12 +938,13 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
 
         case "Animation":
             def update(frame):
+                current_frame[0] = frame  # track it
                 img.set_array(make_image(illumination[frame]).ravel())
                 title.set_text(_make_title_str(moments[frame]))
                 return img, title
 
             ani = FuncAnimation(fig, update, frames=len(moments),
-                                interval=100, blit=False)
+                                interval=ANIM_SPEED, blit=False)
             fig.ani = ani
         
     ax.set_aspect('equal', adjustable='box')
@@ -882,6 +992,36 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
 
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
                      **{**_TITLE_KW, 'transform': fig.transFigure})
+    
+    # -- Cursor ---
+    annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points",
+                        bbox=dict(boxstyle="round", fc="white", alpha=0.8))
+    annot.set_visible(False)
+    current_frame = [0]  # list so it's mutable from nested functions
+
+    def on_move(event):
+        if event.inaxes != ax:
+            annot.set_visible(False)
+            fig.canvas.draw_idle()
+            return
+        # get the data value at cursor
+        col = int(np.searchsorted(np.degrees(longitudes), event.xdata+0.9) - 1)
+        row = int(np.searchsorted(np.degrees(latitudes),  event.ydata+0.5) - 1)
+        col = np.clip(col, 0, n_lon - 1)
+        row = np.clip(row, 0, n_lat - 1)
+        if MODE == "Slider":
+            idx = int(slider.val)
+        elif MODE == "Animation":
+            idx = current_frame[0]
+        else:
+            idx = 0
+        val = illumination[idx].reshape(n_lat, n_lon)[row, col] if illumination.ndim == 2 else illumination.reshape(n_lat, n_lon)[row, col]
+        annot.xy = (event.xdata, event.ydata)
+        annot.set_text(f"{val:.1f} W/m²\nLon: {event.xdata:.1f}°\nLat: {event.ydata:.1f}°")
+        annot.set_visible(True)
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect("motion_notify_event", on_move)
 
     match MODE:
         case "Still":
@@ -903,12 +1043,13 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
 
         case "Animation":
             def update(frame):
+                current_frame[0] = frame  # track it
                 img.set_array(illumination[frame].reshape(n_lat, n_lon).ravel())
                 title.set_text(_make_title_str(moments[frame]))
                 return img, title
 
             ani = FuncAnimation(fig, update, frames=len(moments),
-                                interval=100, blit=False)
+                                interval=ANIM_SPEED, blit=False)
             fig.ani = ani
 
     plt.show()
@@ -1096,6 +1237,7 @@ def select_parameters():
     global POINT, CALCULATE_ILLUMINATION, ONLY_VISIBLE_SURFACE
     global RESOLUTION, TIME_FRAME, TIME_STEP
     global LAT_DEG, LON_DEG, LAT_OFFSET, LON_OFFSET, LAT_PORTION, LON_PORTION
+    global ABCORR, ANIM_SPEED
 
     BODIES    = ["Io", "Europa", "Ganymede", "Callisto", "Jupiter"]
     OBSERVERS = BODIES + ["Sun", "Earth", "Moon", "HST"]
@@ -1139,6 +1281,9 @@ def select_parameters():
 
     if not MODE and not POINT:
         MODE = _pick("Output mode", MODES)
+
+    if not ANIM_SPEED and MODE == "Animation":
+        ANIM_SPEED = _ask_int("Animation playback speed (ms between frames)", 1, 10000, 200)
 
     if not PRESENTATION and not POINT:
         PRESENTATION = _pick("Presentation", PRESENTS)
@@ -1204,7 +1349,7 @@ def select_parameters():
         LAT_DEG=LAT_DEG, LON_DEG=LON_DEG,
         LAT_OFFSET=LAT_OFFSET, LON_OFFSET=LON_OFFSET,
         LAT_PORTION=LAT_PORTION, LON_PORTION=LON_PORTION,
-        ABCORR=ABCORR,
+        ABCORR=ABCORR, ANIM_SPEED=ANIM_SPEED
     )
     col = max(len(k) for k in cfg)
     for k, v in cfg.items():
