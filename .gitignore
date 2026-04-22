@@ -1,6 +1,0 @@
-# Ignorera SPICE-kernels
-*.bsp
-*.tls
-*.tpc
-*.tf
-.vscode/
