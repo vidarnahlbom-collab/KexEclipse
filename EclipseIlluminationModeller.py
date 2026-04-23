@@ -32,10 +32,6 @@ Does not take into account limb darkening
 Surface points are only calculated once, so if observer perspective shifts alot during time frame,
 the points seen at the ends of the time frame are not accurate. 
 In essence, only the middle frame is accurate. 
-
-Subobserver longitude and latitude division is not correct. 
-If the observer is far from the ecliptic plane, the half of the object facing the observer is not correctly modeled.
-Essentially visualisation work best for observers near the ecliptic plane.
 """
 
 # region Initial setup: dependency check, kernel furnishing and global inits
@@ -686,6 +682,18 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     # fig.canvas.mpl_connect("pick_event", on_pick)
     
     # ── mode ──────────────────────────────────────────────────────────────────
+
+    def update(frame):
+        current_frame[0] = frame
+        idx = int(frame)
+        # 1. Update colors (Optimized: uses flattened array)
+        surf.set_facecolor(all_facecolors[idx])
+        # 2. Update title
+        title.set_text(_make_title_str(moments[idx]))
+        # 3. Force draw (draw_idle is better for interactivity)
+        fig.canvas.draw_idle()
+        return surf, title
+    
     match MODE:
         case "Still":
             pass  # already set up for still mode, no updates needed
@@ -701,17 +709,6 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                             interval=ANIM_SPEED, blit=False, repeat=True)
             # Attach to fig to keep reference alive
             fig.ani = ani
-        
-    def update(frame):
-        current_frame[0] = frame
-        idx = int(frame)
-        # 1. Update colors (Optimized: uses flattened array)
-        surf.set_facecolor(all_facecolors[idx])
-        # 2. Update title
-        title.set_text(_make_title_str(moments[idx]))
-        # 3. Force draw (draw_idle is better for interactivity)
-        fig.canvas.draw_idle()
-        return surf, title
                     
     ax.set_aspect('equal', adjustable='box')
 
