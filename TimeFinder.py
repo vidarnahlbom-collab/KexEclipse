@@ -125,24 +125,26 @@ def main():
 
         # The observer moon(s). Options: "Io", "Europa", "Ganymede", "Callisto", "Jupiter"
         # So standing on the moon, looking at the sun, and checking if jupiter or another moon is in the way.
-        moons   = ["Io", "Europa", "Ganymede", "Callisto"]
+        bodies0 = ["Io", "Europa", "Ganymede", "Callisto"]
 
         # The occluding body/bodies (front). Options: "Io", "Europa", "Ganymede", "Callisto", "Jupiter"
         bodies1 = ["Jupiter"]
+
+        observer = "Earth" # For light time calculations
         
     else:
-        start, end, types, moons, bodies1, body2, step = select_parameters_occultation()
+        start, end, types, bodies0, bodies1, body2, observer, step = select_parameters_occultation()
 
     start = spice.str2et(start)
     end   = spice.str2et(end)
 
-    for moon in moons:
+    for body0 in bodies0:
         for body1 in bodies1:
-            if moon.upper() != body1.upper():
-                _, trgepc, _ = spice.subpnt("NEAR POINT/ELLIPSOID", moon.upper(), start,
-                                            "IAU_" + moon.upper(), "LT+S", "EARTH")
+            if body0.upper() != body1.upper():
+                _, trgepc, _ = spice.subpnt("NEAR POINT/ELLIPSOID", body0.upper(), start,
+                                            "IAU_" + body0.upper(), "LT+S", observer)
                 light_travel_time = start - trgepc
-                occultations(types, body1.upper(), body2.upper(), moon.upper(),
+                occultations(types, body1.upper(), body2.upper(), body0.upper(),
                              start - light_travel_time,
                              end   - light_travel_time,
                              light_travel_time, step)
@@ -295,7 +297,7 @@ def _section(title: str):
     print(f"{'─'*50}")
 # endregion
 
-def select_parameters_occultation() -> tuple[str, str, list[str], str, float, float, float]:
+def select_parameters_occultation() -> tuple[str, str, list[str], str, list[str], list[str], str, float]:
     '''
     Asks the user to select parameters for occultation search.
 
@@ -304,8 +306,9 @@ def select_parameters_occultation() -> tuple[str, str, list[str], str, float, fl
         end (str):              UTC end time
         types (list[str]):      Occultation types to search for
         body2 (str):            The back body (usually "Sun")
-        moons (list[str]):      Observer moons
+        bodies0 (list[str]):      occluded bodies
         bodies1 (list[str]):    Occluding bodies
+        observer (str):         The observer, for time calculation 
         step (float):           Search step size in seconds
     '''
 
@@ -326,12 +329,14 @@ def select_parameters_occultation() -> tuple[str, str, list[str], str, float, fl
     # ── bodies ────────────────────────────────────────────────────────────────
     _section("Bodies")
 
-    print("  Hint: Observer moons are treated as point sources.")
-    moons   = _pick_multi("Observer moon(s)", BODIES)
+    print("  Hint: Occluded bodies are treated as point sources.")
+    bodies0   = _pick_multi("Occluded body/bodies", BODIES)
     bodies1 = _pick_multi("Occluding body/bodies (front)", BODIES)
 
     back_options = ["Sun"] + BODIES
-    body2 = _pick("Back body (being occulted)", back_options, default="Sun")
+    body2 = _pick("Back body (being eclipsed)", back_options, default="Sun")
+
+    observer = _pick("Observer (for light travel time calculation)", BODIES + ["Earth"], default="Earth")
 
     # ── occultation types ─────────────────────────────────────────────────────
     _section("Occultation types")
@@ -355,13 +360,13 @@ def select_parameters_occultation() -> tuple[str, str, list[str], str, float, fl
     print("║   Configuration summary              ║")
     print("╚══════════════════════════════════════╝")
     cfg = dict(start=start, end=end, types=types,
-               moons=moons, bodies1=bodies1, body2=body2, step=step)
+               bodies0=bodies0, bodies1=bodies1, body2=body2, observer=observer, step=step)
     col = max(len(k) for k in cfg)
     for k, v in cfg.items():
         print(f"  {k:<{col}} = {v}")
     print()
 
-    return start, end, types, moons, bodies1, body2, step
+    return start, end, types, bodies0, bodies1, body2, observer, step
 
 
 if __name__ == '__main__':  

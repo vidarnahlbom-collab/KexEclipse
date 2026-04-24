@@ -481,6 +481,7 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
     Returns: 
         _ (np.ndarray[np.float64]):     Array of blocked fractions for every point
     '''
+    # Sun is 1
     props1 = np.array(body1_disk_props)
     props2 = np.array(body2_disk_props)
 
@@ -496,13 +497,14 @@ def get_blocked_fractions(body1_disk_props: np.ndarray[np.ndarray[np.float64]],
     # Check if fully blocked
     full_block = (ang_sep <= np.abs(r1 - r2)) & (r2 >= r1)
 
-    # Check if partially blockeang_sep
+    # Check if partially blocked
     partial_block_r2 = (ang_sep <= np.abs(r1 - r2)) & (r2 < r1)
 
     part1 = r1**2 * np.arccos(np.clip((ang_sep**2 + r1**2 - r2**2) / (2*ang_sep*r1), -1.0, 1.0))
     part2 = r2**2 * np.arccos(np.clip((ang_sep**2 + r2**2 - r1**2) / (2*ang_sep*r2), -1.0, 1.0))
     part3 = 0.5 * np.sqrt(np.clip((-ang_sep+r1+r2)*(ang_sep+r1-r2)*(ang_sep-r1+r2)*(ang_sep+r1+r2), 0.0, None))
 
+    # We divide by sun area to get fraction
     partial_overlap = (part1 + part2 - part3) / (np.pi * r1**2)
 
     return np.where(no_overlap, 0.0,
