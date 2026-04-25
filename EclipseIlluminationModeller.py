@@ -113,8 +113,8 @@ def furnish_kernels() -> None:
 
 furnish_kernels()
 
-BLOCKEE       = ""
-BLOCKERS      = []
+OCCULTED       = ""
+OCCULTING      = []
 OBSERVER      = ""
 MODE          = ""
 PRESENTATION  = ""
@@ -139,24 +139,24 @@ ANIM_SPEED = None
 if MANUAL_SELECTION:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
-    #UTC, BLOCKEE, BLOCKERS = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
+    #UTC, OCCULTED, OCCULTING = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
 
     # Jupiter eclipsed by Io
-    #UTC, BLOCKEE, BLOCKERS = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
+    #UTC, OCCULTED, OCCULTING = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
 
     # Triple shadow transit
-    UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:45:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
+    UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:45:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
-    #UTC, BLOCKEE, BLOCKERS = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
+    #UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
 
     # Io eclipsed by Callisto
-    #UTC, BLOCKEE, BLOCKERS = "2021 Apr 20 15:55:38", "Io", ['Callisto']
+    #UTC, OCCULTED, OCCULTING = "2021 Apr 20 15:55:38", "Io", ['Callisto']
     # endregion
 
     # region Evaluation times (Ignore):
     # Callisto Eval times:
-    #BLOCKEE, BLOCKERS = "Callisto", ['Jupiter']
+    #OCCULTED, OCCULTING = "Callisto", ['Jupiter']
     #UTC = "2025-11-12 13:55:33" # partial penumbral
 
     #UTC = "2025-11-12 08:08:26" # Start 1
@@ -187,7 +187,7 @@ if MANUAL_SELECTION:
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
     CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
-    ONLY_VISIBLE_SURFACE = True    # Chooses if only half the blockee should be shown (as seen from the observer)
+    ONLY_VISIBLE_SURFACE = True    # Chooses if only half the occulted body should be shown (as seen from the observer)
 
     #Simulation Fidelity:
     RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
@@ -226,7 +226,7 @@ def main() -> None:
     blocking_total = np.array([]) 
     moments = []
 
-    start_rec, trgepc, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", BLOCKEE, et_reception, "IAU_" + BLOCKEE, ABCORR, OBSERVER)
+    start_rec, trgepc, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", OCCULTED, et_reception, "IAU_" + OCCULTED, ABCORR, OBSERVER)
     
     light_travel_time = et_reception - trgepc
     et_emission = et_reception - light_travel_time  
@@ -234,7 +234,7 @@ def main() -> None:
     solar_constant = get_solar_constant(et_emission)
     
     if POINT:
-        srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et_emission, "IAU_" + BLOCKEE, [[np.deg2rad(LON_DEG),np.deg2rad(LAT_DEG)]]))
+        srf_points = np.array(spice.latsrf("ellipsoid", OCCULTED, et_emission, "IAU_" + OCCULTED, [[np.deg2rad(LON_DEG),np.deg2rad(LAT_DEG)]]))
     else:
         start_lonlat = spice.reclat(start_rec)[1:]
         norm_sub_obs_vec = sub_observer_vector / np.linalg.norm(sub_observer_vector)
@@ -268,8 +268,8 @@ def main() -> None:
 
 def get_solar_constant(et: int) -> float:
     '''
-    Calculates the solar irradiance at BLOCKEE position of selected time et
-    DEPENDS ON GLOBALS BLOCKEE, ABCORR
+    Calculates the solar irradiance at OCCULTED position of selected time et
+    DEPENDS ON GLOBALS OCCULTED, ABCORR
 
     Args:
         et (int):       The (ephemeris) time at which the calculation should be made
@@ -281,7 +281,7 @@ def get_solar_constant(et: int) -> float:
 
     # get Sun–body distance at et
     # It also has the sun as observer not OBSERVER since we want the numeric values on the surface, not as seen from the observer.
-    position, _ = spice.spkpos("SUN", et, "J2000", ABCORR, BLOCKEE) 
+    position, _ = spice.spkpos("SUN", et, "J2000", ABCORR, OCCULTED) 
     distance = spice.vnorm(position) * 1000      # distance in metres
 
     # solar irradiance at that distance (W/m²)
@@ -294,8 +294,8 @@ def get_illum(moment: int,
               srf_points: np.ndarray[np.ndarray[np.float64]]
               ) -> tuple[np.ndarray[np.bool], np.ndarray[np.float64]]:
     '''
-    Calculates the illumination data for each surface point on BLOCKEE, including if it is illuminated at all and the incidence angle.
-    DEPENDS ON GLOBALS BLOCKEE, ABCORR, OBSERVER
+    Calculates the illumination data for each surface point on OCCULTED, including if it is illuminated at all and the incidence angle.
+    DEPENDS ON GLOBALS OCCULTED, ABCORR, OBSERVER
 
     Args:
         moment (int):                                       Ephemeris time for which to calculate illumination data
@@ -312,7 +312,7 @@ def get_illum(moment: int,
     for srf_point in srf_points:
         #trgepc, srfvec, phase, incdnc, emissn, visibl, lit 
         _, _, _, incdnc, _, _, lit = spice.illumf(
-            "ELLIPSOID", BLOCKEE, "Sun", moment, "IAU_"+BLOCKEE, ABCORR, OBSERVER, srf_point)
+            "ELLIPSOID", OCCULTED, "Sun", moment, "IAU_"+OCCULTED, ABCORR, OBSERVER, srf_point)
         lit_flags.append(lit)
         incidence_angles.append(incdnc)
 
@@ -324,9 +324,9 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
                    moment: float,
                    ) -> np.ndarray[np.float64]:
     '''
-    Calculates % of sunlight hitting the surface at each surface point on BLOCKEE at a given moment.
-    Takes into account eclipses from BLOCKERS and sun illumination angle.
-    DEPENDS ON GLOBALS BLOCKEE, BLOCKERS, CALCULATE_ILLUMINATION
+    Calculates % of sunlight hitting the surface at each surface point on OCCULTED at a given moment.
+    Takes into account eclipses from OCCULTING and sun illumination angle.
+    DEPENDS ON GLOBALS OCCULTED, OCCULTING, CALCULATE_ILLUMINATION
 
     Args:
         srf_points (np.ndarray[np.ndarray[np.float64]]):    Array of surface points in km, shape (resolution^2, 3)
@@ -349,15 +349,15 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
         return blocking_at_moment  # everything dark, skip all SPICE work
 
     # We only get disk properties for the lit points
-    # Get the disk properties of the sun and blockers as seen from the surface points.
+    # Get the disk properties of the sun and occulting body as seen from the surface points.
     sun_disk_props = get_disk_properties("Sun", moment, lit_points)
 
     blocking_of_lit_points = np.zeros(len(lit_points))
 
-    # For every blocker, calculate the blocked fractions of the sun for every lit point and then combine them 
-    for blocker in BLOCKERS:
-        blocker_disk_props = get_disk_properties(blocker, moment, lit_points)
-        blocking = get_blocked_fractions(sun_disk_props, blocker_disk_props)
+    # For every occulting body, calculate the blocked fractions of the sun for every lit point and then combine them 
+    for occulting in OCCULTING:
+        occulting_body_disk_props = get_disk_properties(occulting, moment, lit_points)
+        blocking = get_blocked_fractions(sun_disk_props, occulting_body_disk_props)
         blocking_of_lit_points = np.clip(blocking_of_lit_points + blocking, 0.0, 1.0) 
         # CURRENTLY ADDITATIVE.
         # WE DO NOT CALCULATE WHAT PART OF THE SUN IS BLOCKED. 
@@ -383,7 +383,7 @@ def create_pos_array(et: int,
                                np.ndarray[np.float64]]:
     '''
     Creates an array of surface points facing the sun at the given time, in Cartesian coordinates in the IAU body fixed frame.
-    Depends on globals BLOCKEE and RESOLUTION
+    Depends on globals OCCULTED and RESOLUTION
 
     Args:    
         et (float):         Ephemeris time for which to calculate surface points
@@ -429,7 +429,7 @@ def create_pos_array(et: int,
     #print(lonlat)
     # Now we put this into spice.latsrf. lonlat will be parsed as planetocentric 
 
-    srf_points = np.array(spice.latsrf("ellipsoid", BLOCKEE, et, "IAU_" + BLOCKEE, lonlat))
+    srf_points = np.array(spice.latsrf("ellipsoid", OCCULTED, et, "IAU_" + OCCULTED, lonlat))
 
     return srf_points, longitudes, latitudes
 
@@ -441,7 +441,7 @@ def get_disk_properties(body: str,
                         ) -> np.ndarray[np.ndarray[np.float64]]:
     '''
     Returns the coordinates and angular radius in the sky of the body as seen from every surface point.
-    DEPENDS ON GLOBALS BLOCKEE and ABCORR
+    DEPENDS ON GLOBALS OCCULTED and ABCORR
 
     Args:
         body (str):                                         Name of the body to calculate disk properties for
@@ -455,7 +455,7 @@ def get_disk_properties(body: str,
     
     relative_positions = []
     for point in srf_points:
-        rel_pos = spice.spkcpo(body, et, "IAU_"+BLOCKEE, "OBSERVER", ABCORR, point, BLOCKEE, "IAU_"+BLOCKEE)[0][:3]
+        rel_pos = spice.spkcpo(body, et, "IAU_"+OCCULTED, "OBSERVER", ABCORR, point, OCCULTED, "IAU_"+OCCULTED)[0][:3]
         relative_positions.append(rel_pos)
 
     # Convert to np.arrays for optimization
@@ -528,8 +528,8 @@ _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
 # region ── Shared visualisation helpers ───────────────────────────────────────────────
 def _make_title_str(moment: float) -> str:
     utc = spice.et2utc(moment, 'C', 0)
-    return (f"Blockee: {BLOCKEE}\n"
-            f"Blockers: {',\n'.join(BLOCKERS)}\n"
+    return (f"Occulted: {OCCULTED}\n"
+            f"Occulting: {',\n'.join(OCCULTING)}\n"
             f"Observer: {OBSERVER}\n"
             #f"UTC: {spice.et2utc(moment, 'C', 0)}")
             f"UTC: {utc[:11]}\n  {utc[11:]}")
@@ -1103,7 +1103,7 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
     ax.set_xticks(tick_indices)
     ax.set_xticklabels([utc_times[i] for i in tick_indices], rotation=30, ha='right', fontsize=8)
     ax.set_ylabel('Illumination (W/m²)')
-    ax.set_title(f"{BLOCKEE} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
+    ax.set_title(f"{OCCULTED} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
     #ax.set_facecolor('black')
     #fig.patch.set_facecolor('black')
     #ax.tick_params(colors='white')
@@ -1232,7 +1232,7 @@ def select_parameters():
     they need.  Global variables that were already non-empty are left
     unchanged and skipped in the prompts.
     """
-    global BLOCKEE, BLOCKERS, OBSERVER, MODE, PRESENTATION, UTC
+    global OCCULTED, OCCULTING, OBSERVER, MODE, PRESENTATION, UTC
     global POINT, CALCULATE_ILLUMINATION, ONLY_VISIBLE_SURFACE
     global RESOLUTION, TIME_FRAME, TIME_STEP
     global LAT_DEG, LON_DEG, LAT_OFFSET, LON_OFFSET, LAT_PORTION, LON_PORTION
@@ -1252,18 +1252,18 @@ def select_parameters():
     # ── bodies ────────────────────────────────────────────────────────────────
     _section("Bodies & Time")
 
-    if not BLOCKEE:
-        BLOCKEE = _pick("Blockee (body to be occulted)", BODIES)
+    if not OCCULTED:
+        OCCULTED = _pick("Occulted body", BODIES)
 
-    if not BLOCKERS:
-        BLOCKERS = _pick_multi(
-            "Blockers — comma-separated, or Enter for all others",
-            BODIES, exclude=[BLOCKEE]
+    if not OCCULTING:
+        OCCULTING = _pick_multi(
+            "Occulting bodies — comma-separated, or Enter for all others",
+            BODIES, exclude=[OCCULTED]
         )
 
     if not OBSERVER:
         OBSERVER = _pick("Observer", OBSERVERS,
-                         default="Earth", exclude=[BLOCKEE])
+                         default="Earth", exclude=[OCCULTED])
         
     if not UTC:
         UTC = _ask_utc("UTC Time of event", UTC)
@@ -1339,7 +1339,7 @@ def select_parameters():
     print("║   Configuration summary              ║")
     print("╚══════════════════════════════════════╝")
     cfg = dict(
-        BLOCKEE=BLOCKEE, BLOCKERS=BLOCKERS, OBSERVER=OBSERVER,
+        OCCULTED=OCCULTED, OCCULTING=OCCULTING, OBSERVER=OBSERVER,
         UTC=UTC,
         MODE=MODE, PRESENTATION=PRESENTATION,
         POINT=POINT, CALCULATE_ILLUMINATION=CALCULATE_ILLUMINATION,
