@@ -1266,7 +1266,7 @@ def select_parameters():
                          default="Earth", exclude=[OCCULTED])
         
     if not UTC:
-        UTC = _ask_utc("UTC Time of event", UTC)
+        UTC = _ask_utc("UTC Time when observer sees event", UTC)
 
     # ── Point ───────────────────────────────────────────────────────────────
     _section("Point-tracking mode")
