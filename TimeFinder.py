@@ -8,13 +8,13 @@
 # ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
 # ║                                                                                          ║
 # ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
-# ║   2026-04-13  ·  KEX L5                                                                  ║
+# ║   2026-04-29  ·  KEX L5                                                                  ║
 # ║                                                                                          ║
 # ║   Adapted from the example on the documentation page for gfoclt                          ║
 # ║   https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/spicelib/gfoclt.html           ║
 # ║                                                                                          ║
 # ║   Originally that part of code is from akkana spice examples on github                   ║
-# ║   https://github.com/akkana/spice-examples/blob/master/transits.py                       ║                                                               ║
+# ║   https://github.com/akkana/spice-examples/blob/master/transits.py                       ║                                                               
 # ║                                                                                          ║
 # ║   Galilean moon eclipse and transit time finder                                          ║
 # ║   Uses SPICE kernels via SpiceyPy for ephemeris data                                     ║
@@ -24,7 +24,7 @@
 # ║   If youre reading this, you are able to change parameters in the code,                  ║
 # ║   skipping the questionnare at the start of code running in terminal.                    ║
 # ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
-# ║   The code will then instead follow selection in "if MANUAL_SELECTION:" in main().       ║                                                                      ║
+# ║   The code will then instead follow selection in "if MANUAL_SELECTION:" in main().       ║                                                                      
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
 MANUAL_SELECTION = False
 

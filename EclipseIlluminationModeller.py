@@ -8,7 +8,7 @@
 # ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
 # ║                                                                                          ║
 # ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
-# ║   2026-04-13  ·  KEX L5                                                                  ║
+# ║   2026-04-29  ·  KEX L5                                                                  ║
 # ║                                                                                          ║
 # ║                                                                                          ║
 # ║   Jupiter moon eclipse & illumination simulator                                          ║
