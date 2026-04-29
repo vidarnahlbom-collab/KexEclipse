@@ -22,7 +22,7 @@
 # ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
 # ║   The code will then instead follow selection in "if MANUAL_SELECTION:".                 ║                                                                      
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
-MANUAL_SELECTION = False
+MANUAL_SELECTION = True
 
 """ Current errors and phenomena not handled by the model:
 Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
@@ -139,7 +139,7 @@ ANIM_SPEED = None
 if MANUAL_SELECTION:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
-    UTC, OCCULTED, OCCULTING = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
+    UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']   
 
     # Jupiter eclipsed by Io
     #UTC, OCCULTED, OCCULTING = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
@@ -182,15 +182,15 @@ if MANUAL_SELECTION:
     # region MAIN CONFIGURATION:
     # Available time handling modes: Still, Slider, Animation
     # Available Presentation ways: Circle, Rectangle, Dots, Surface
-    MODE = "Slider"
+    MODE = "Still"
     PRESENTATION = "Circle"
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
-    CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
+    CALCULATE_ILLUMINATION = False     # Chooses if the illumination function is used; bettcer lighting but slower
     ONLY_VISIBLE_SURFACE = True    # Chooses if only half the occulted body should be shown (as seen from the observer)
 
     #Simulation Fidelity:
-    RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    RESOLUTION = 500     # Number of points in each direction for surface point array, so total number of points is resolution^2
     TIME_FRAME = 1000 # The time in seconds that the animation includes, back and forth
     TIME_STEP = 1000     # The time in seconds that each step moves forward with
     # endregion
@@ -538,7 +538,8 @@ _PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
 _CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
 _SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
 _TITLE_X, _TITLE_Y = 0.02, 0.97
-_TITLE_FS         = 11
+_TITLE_FS         = 25
+_FS         = 21
 _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
                  wrap=True, linespacing=1.8, transform=None)  # transform set per-fig
 _STATE_LABELS = {0: "Unlit", 1: "Lit", 2: "Penumbra", 3: "Umbra"}
@@ -557,9 +558,11 @@ def _make_title_str(moment: float) -> str:
 def _add_colorbar(fig, mappable, solar_constant: float):
     cbar_ax = fig.add_axes(_CBAR_RECT)
     cb = fig.colorbar(mappable, cax=cbar_ax)
-    cb.set_label('Illumination (W/m²)')
+    cb.set_label('Illumination (W/m²)', fontsize=_FS)
     cb.set_ticks([0, solar_constant])
     cb.set_ticklabels(['0', f'{solar_constant:.1f}'])
+    cb.ax.tick_params(labelsize=_FS)
+    
     return cbar_ax
 
 
@@ -897,13 +900,16 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
     img = ax.pcolormesh(u_grid, v_grid, make_image(initial),
                         cmap='gray', vmin=0, vmax=solar_constant, shading='nearest')
     ax.set_facecolor('darkblue')
-    ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)')
+    ax.set_xlabel('X (km)', fontsize=_FS); ax.set_ylabel('Y (km)', fontsize=_FS)
     ax.set_aspect('equal', adjustable='box')
+
+    ax.tick_params(axis='both', which='major', labelsize=_FS)
 
     _add_colorbar(fig, img, solar_constant)
 
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
                      **{**_TITLE_KW, 'transform': fig.transFigure})
+    
     
     # -- Cursor -----
     n_lat = len(latitudes)
@@ -939,6 +945,7 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
         annot.xy = (event.xdata, event.ydata)
         state = (point_states[idx] if point_states.ndim == 2 else point_states)[ind]
         annot.set_text(f"{val:.1f} W/m²\nLon: {lon_deg:.1f}°\nLat: {lat_deg:.1f}°\n{_STATE_LABELS[int(state)]}")
+        annot.set_fontsize(_FS)
         annot.set_visible(True)
         fig.canvas.draw_idle()
 
