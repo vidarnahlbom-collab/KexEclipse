@@ -154,7 +154,15 @@ if MANUAL_SELECTION:
     #UTC, OCCULTED, OCCULTING = "2021 Apr 20 15:55:38", "Io", ['Callisto']
     # endregion
 
+    # Europa eclipse study 
+    UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']
+    TIME_FRAME = 200
+    TIME_STEP = 25
+    LON_DEG = -12
+    LAT_DEG = 0
     # region Evaluation times (Ignore):
+
+
     # Callisto Eval times:
     #OCCULTED, OCCULTING = "Callisto", ['Jupiter']
     #UTC = "2025-11-12 13:55:33" # partial penumbral
@@ -520,9 +528,11 @@ _PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
 _CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
 _SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
 _TITLE_X, _TITLE_Y = 0.02, 0.97
-_TITLE_FS         = 11
+_TITLE_FS         = 15
 _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
                  wrap=True, linespacing=1.8, transform=None)  # transform set per-fig
+_TICK_FS  = 13   # axis tick labels
+_LABEL_FS = 14   # axis labels (X km, Y km etc.)
 # endregion
 
 # region ── Shared visualisation helpers ───────────────────────────────────────────────
@@ -549,6 +559,11 @@ def _add_slider(fig, n_frames: int):
     slider = Slider(slider_ax, "Time step", 0, n_frames - 1,
                     valinit=0, valstep=1)
     return slider
+
+def _style_ax(ax):
+    ax.tick_params(labelsize=_TICK_FS)
+    ax.xaxis.label.set_size(_LABEL_FS)
+    ax.yaxis.label.set_size(_LABEL_FS)
 # endregion
 
 
@@ -875,6 +890,8 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
     ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)')
     ax.set_aspect('equal', adjustable='box')
 
+    _style_ax(ax)
+
     _add_colorbar(fig, img, solar_constant)
 
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
@@ -987,6 +1004,8 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
     ax.set_ylabel("Latitude (°)")
     ax.set_aspect('equal', adjustable='box')
 
+    _style_ax(ax)
+
     _add_colorbar(fig, img, solar_constant)
 
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
@@ -1070,7 +1089,13 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
     from scipy.interpolate import make_interp_spline
     
     illumination = (1 - np.array(blocked_data).squeeze()) * solar_constant
-    utc_times = [spice.et2utc(m, 'C', 0) for m in moments]
+    one_day = 86400
+    if TIME_FRAME < one_day:
+        date_str = spice.et2utc(moments[0], 'C', 0)[:11]   # "2025 NOV 12"
+        utc_times = [spice.et2utc(m, 'C', 0)[12:] for m in moments]  # "08:08:26"
+    else:
+        date_str = None
+        utc_times = [spice.et2utc(m, 'C', 0) for m in moments]
 
     # Print table
     print(f"\nTracked point — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
@@ -1103,7 +1128,12 @@ def graph_point(blocked_data: np.ndarray[np.ndarray[np.float64]],
     ax.set_xticks(tick_indices)
     ax.set_xticklabels([utc_times[i] for i in tick_indices], rotation=30, ha='right', fontsize=8)
     ax.set_ylabel('Illumination (W/m²)')
-    ax.set_title(f"{OCCULTED} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°")
+    if TIME_FRAME < one_day:
+        ax.set_title(f"{OCCULTED} on {date_str} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°", fontsize=_TITLE_FS)
+    else:
+        ax.set_title(f"{OCCULTED} — Lon: {LON_DEG:.2f}°  Lat: {LAT_DEG:.2f}°", fontsize=_TITLE_FS)
+
+    _style_ax(ax)
     #ax.set_facecolor('black')
     #fig.patch.set_facecolor('black')
     #ax.tick_params(colors='white')

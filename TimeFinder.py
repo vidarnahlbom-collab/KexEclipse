@@ -144,14 +144,14 @@ def main():
                 _, trgepc, _ = spice.subpnt("NEAR POINT/ELLIPSOID", body0.upper(), start,
                                             "IAU_" + body0.upper(), "LT+S", observer)
                 light_travel_time = start - trgepc
-                occultations(types, body1.upper(), body2.upper(), body0.upper(),
+                occultations(types, body1.upper(), body2.upper(), body0.upper(), observer.upper(),
                              start - light_travel_time,
                              end   - light_travel_time,
                              light_travel_time, step)
     
     input("\n\nPress the enter key to exit.")
 
-def occultations(types, body1, body2, obsrvr, start, end, light_travel_time, step):
+def occultations(types, body1, body2, body0, observer, start, end, light_travel_time, step):
     # Size of the window/intervall between start and end date, not sure how it works
     MAXWIN = 200
 
@@ -174,24 +174,27 @@ def occultations(types, body1, body2, obsrvr, start, end, light_travel_time, ste
     for occtype in types:
             front = body1
             fframe = "IAU_" + body1
-            back = body2
-            bframe = "IAU_" + body2
+            back = body0
+            bframe = "IAU_" + body0
             # Objects modelled as ellipsoids initally for rough time frame finding. 
             # Remember observer moon is point source so effectively we are checking if the sun is occluded by jupiter in any way, from the center
             # the moon.
             spice.gfoclt(occtype,
                             front, "ellipsoid", fframe,
                             back,  "ellipsoid", bframe,
-                            "LT+S", obsrvr, step,
+                            "NONE", body2, step,
                             cnfine, result)
 
             # Display the results
             print()
-            title = spice.repmc("Condition: # occultation of # by # as seen from center of #", "#",
+            title = spice.repmc("Condition: # occultation of center of # by # from #, observer: #", "#",
                                    occtype)
-            title = spice.repmc(title, "#", back)
+            title = spice.repmc(title, "#", body0)
             title = spice.repmc(title, "#", front)
-            title = spice.repmc(title, "#", obsrvr)
+            title = spice.repmc(title, "#", body2)
+            title = spice.repmc(title, "#", observer)
+
+
             print(title)
             count = spice.wncard(result)
             for i in range(count):
