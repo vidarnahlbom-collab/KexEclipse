@@ -8,7 +8,7 @@
 # ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
 # ║                                                                                          ║
 # ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
-# ║   2026-04-13  ·  KEX L5                                                                  ║
+# ║   2026-04-29  ·  KEX L5                                                                  ║
 # ║                                                                                          ║
 # ║                                                                                          ║
 # ║   Jupiter moon eclipse & illumination simulator                                          ║
@@ -20,9 +20,9 @@
 # ║   If youre reading this, you are able to change model parameters in the code,            ║
 # ║   skipping the questionnare at the start of code running in terminal.                    ║
 # ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
-# ║   The code will then instead follow selection in "if MANUAL_SELECTION:".                 ║                                                                      ║
+# ║   The code will then instead follow selection in "if MANUAL_SELECTION:".                 ║                                                                      
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
-MANUAL_SELECTION = False
+MANUAL_SELECTION = True
 
 """ Current errors and phenomena not handled by the model:
 Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
@@ -139,13 +139,13 @@ ANIM_SPEED = None
 if MANUAL_SELECTION:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
-    #UTC, OCCULTED, OCCULTING = "2021 Apr 25 16:09:31", "Europa", ['Jupiter']   
+    UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']   
 
     # Jupiter eclipsed by Io
     #UTC, OCCULTED, OCCULTING = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
 
     # Triple shadow transit
-    UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:45:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
+    #UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:45:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
     #UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
@@ -190,15 +190,15 @@ if MANUAL_SELECTION:
     # region MAIN CONFIGURATION:
     # Available time handling modes: Still, Slider, Animation
     # Available Presentation ways: Circle, Rectangle, Dots, Surface
-    MODE = "Slider"
+    MODE = "Still"
     PRESENTATION = "Circle"
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
-    CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
+    CALCULATE_ILLUMINATION = False     # Chooses if the illumination function is used; bettcer lighting but slower
     ONLY_VISIBLE_SURFACE = True    # Chooses if only half the occulted body should be shown (as seen from the observer)
 
     #Simulation Fidelity:
-    RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    RESOLUTION = 500     # Number of points in each direction for surface point array, so total number of points is resolution^2
     TIME_FRAME = 1000 # The time in seconds that the animation includes, back and forth
     TIME_STEP = 1000     # The time in seconds that each step moves forward with
     # endregion
@@ -232,6 +232,7 @@ def main() -> None:
     # We will store the blocked fractions for every time step here, so we can use it for the animation later without having to recalculate it. 
     # This is a 2D array where each row corresponds to a time step and each column corresponds to a surface point.
     blocking_total = np.array([]) 
+    point_states = np.array([])
     moments = []
 
     start_rec, trgepc, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", OCCULTED, et_reception, "IAU_" + OCCULTED, ABCORR, OBSERVER)
@@ -249,14 +250,15 @@ def main() -> None:
         srf_points, longitudes, latitudes = create_pos_array(et_emission, start_lonlat) 
     
     if (MODE == "Still" and not POINT):
-        blocking_total = blocking_moment(srf_points, et_emission)
+        blocking_total, point_states = blocking_moment(srf_points, et_emission)
         moments.append(et_reception)
     else:
         for i, moment_reception in enumerate(range(et_reception-TIME_FRAME, et_reception+TIME_FRAME+1, TIME_STEP)):
             moment_emission = moment_reception - light_travel_time
             print(f"Calculating moment {i+1}/{(2*TIME_FRAME)//TIME_STEP+1}...")
-            blocking_at_moment = blocking_moment(srf_points, moment_emission)
+            blocking_at_moment, point_state_at_moment = blocking_moment(srf_points, moment_emission)
             blocking_total = np.vstack([blocking_total, blocking_at_moment]) if blocking_total.size else blocking_at_moment
+            point_states = np.vstack([point_states, point_state_at_moment]) if point_states.size else point_state_at_moment
             moments.append(moment_reception)
 
     print("Process finished --- %s seconds ---" % (time.time() - start_time))
@@ -264,15 +266,15 @@ def main() -> None:
     if POINT:
         graph_point(blocking_total, moments, solar_constant)
     elif PRESENTATION == "Circle":
-        graph_2D_circle(longitudes, latitudes, srf_points, blocking_total, moments, solar_constant, norm_sub_obs_vec)
+        graph_2D_circle(longitudes, latitudes, srf_points, blocking_total, moments, solar_constant, norm_sub_obs_vec, point_states)
     elif PRESENTATION == "Rectangle":
-        graph_2D_rectangle(longitudes, latitudes, blocking_total, moments, solar_constant)
+        graph_2D_rectangle(longitudes, latitudes, blocking_total, moments, solar_constant, point_states)
     elif PRESENTATION == "Dots":
-        visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat)
+        visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat, point_states)
     elif PRESENTATION == "Surface":
-        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat)
+        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat, point_states)
 
-
+    
 
 def get_solar_constant(et: int) -> float:
     '''
@@ -330,7 +332,7 @@ def get_illum(moment: int,
 
 def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
                    moment: float,
-                   ) -> np.ndarray[np.float64]:
+                   ) -> tuple[np.ndarray[np.float64], np.ndarray[np.int8]]:
     '''
     Calculates % of sunlight hitting the surface at each surface point on OCCULTED at a given moment.
     Takes into account eclipses from OCCULTING and sun illumination angle.
@@ -342,6 +344,7 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
 
     Returns:
         blocking_at_moment (np.ndarray[float64]):    Array of blocked fractions (0 to 1) for each surface point
+        point_state_at_moment (np.ndarray[int8]):   Array of flags for each surface point: 0 = unlit, 1 = lit, 2 = penumbra, 3 = umbra
     '''
     blocking_at_moment = np.ones(len(srf_points)) # Default is dark/unlit, so full block, 1
 
@@ -371,6 +374,21 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
         # WE DO NOT CALCULATE WHAT PART OF THE SUN IS BLOCKED. 
         # NEITHER IS LIMB DARKENING TAKEN INTO ACCOUNT.
 
+    # Define point state flags
+    UNLIT    = 0
+    LIT      = 1
+    PENUMBRA = 2
+    UMBRA    = 3
+
+    # Initialize all points as unlit
+    point_state_at_moment = np.full(len(blocking_at_moment), UNLIT, dtype=np.int8)
+
+    # Classify lit points based on their blocking fraction
+    point_state_at_moment[lit_mask] = np.where(
+        blocking_of_lit_points == 0.0, LIT,
+        np.where(blocking_of_lit_points == 1.0, UMBRA, PENUMBRA)
+    )
+
     if CALCULATE_ILLUMINATION:
         # Apply cosine shading only to lit points
         cos_angles = np.cos(incidence_angles[lit_mask])
@@ -380,7 +398,7 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
     # we change the value to the calculated illumination.
     blocking_at_moment[lit_mask] = blocking_of_lit_points
 
-    return blocking_at_moment
+    return blocking_at_moment, point_state_at_moment
 
 
 
@@ -528,9 +546,11 @@ _PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
 _CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
 _SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
 _TITLE_X, _TITLE_Y = 0.02, 0.97
-_TITLE_FS         = 15
+_TITLE_FS         = 18
+_FS         = 15
 _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
                  wrap=True, linespacing=1.8, transform=None)  # transform set per-fig
+_STATE_LABELS = {0: "Unlit", 1: "Lit", 2: "Penumbra", 3: "Umbra"}
 _TICK_FS  = 13   # axis tick labels
 _LABEL_FS = 14   # axis labels (X km, Y km etc.)
 # endregion
@@ -548,9 +568,11 @@ def _make_title_str(moment: float) -> str:
 def _add_colorbar(fig, mappable, solar_constant: float):
     cbar_ax = fig.add_axes(_CBAR_RECT)
     cb = fig.colorbar(mappable, cax=cbar_ax)
-    cb.set_label('Illumination (W/m²)')
+    cb.set_label('Illumination (W/m²)', fontsize=_FS)
     cb.set_ticks([0, solar_constant])
     cb.set_ticklabels(['0', f'{solar_constant:.1f}'])
+    cb.ax.tick_params(labelsize=_FS)
+    
     return cbar_ax
 
 
@@ -739,7 +761,8 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                       srf_points: np.ndarray[np.ndarray[np.float64]],
                       moments: list[float],
                       solar_constant: float,
-                      start_lonlat: tuple[float, float]):
+                      start_lonlat: tuple[float, float],
+                      point_states: np.ndarray[np.int8]):
     '''
     Visualizes solar eclipse fractions on a planetoid surface.
     
@@ -749,6 +772,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
         moments (list[float]):      Ephemeris times for each frame. Required for 'Slider' and 'Animation'.
         solar_constant (float):     The irradiance at the body.
         start_lonlat (tuple[float, float]): The starting longitude and latitude for the view.
+        point_states (np.ndarray):  The state of each surface point, shape (N,).
     '''
     def make_colors(blocked):
         return np.column_stack([1-blocked, 1-blocked, 1-blocked])
@@ -788,10 +812,12 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
         val = (1 - (blocked_data[idx] if blocked_data.ndim == 2 else blocked_data))[ind] * solar_constant
 
         _, lon_sp, lat_sp = spice.reclat([x[ind], y[ind], z[ind]])
+        state = (point_states[idx] if point_states.ndim == 2 else point_states)[ind]
         readout.set_text(
             f"{val:.1f} W/m²  |  "
             f"Lon: {np.degrees(lon_sp):.1f}°  "
-            f"Lat: {np.degrees(lat_sp):.1f}°"
+            f"Lat: {np.degrees(lat_sp):.1f}°  |  "
+            f"{_STATE_LABELS[int(state)]}"
         )
         fig.canvas.draw_idle()
 
@@ -843,7 +869,8 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
              blocked_data: np.ndarray[np.ndarray[np.float64]],
              moments: list[int],
              solar_constant: float,
-             obs_to_body_vec: np.ndarray[np.float64]):
+             obs_to_body_vec: np.ndarray[np.float64],
+             point_states: np.ndarray[np.int8]):
     '''
     Plots the 2D surface of the entire body, with illumination
 
@@ -855,6 +882,7 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
         moments (list[int]):                                List of times which should be plotted
         solar_constant (float):                             The solar irradiance at the body and average time
         obs_to_body_vec (np.ndarray[np.float64]):           Normalized vector from observer to body center
+        point_states (np.ndarray[np.int8]):                 The state of each surface point, shape (N,).
     '''
     # ── projection ────────────────────────────────────────────────────────────
     arbitrary = np.array([0, 0, 1]) if abs(obs_to_body_vec[2]) < 0.9 else np.array([1, 0, 0])
@@ -887,15 +915,16 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
     img = ax.pcolormesh(u_grid, v_grid, make_image(initial),
                         cmap='gray', vmin=0, vmax=solar_constant, shading='nearest')
     ax.set_facecolor('darkblue')
-    ax.set_xlabel('X (km)'); ax.set_ylabel('Y (km)')
+    ax.set_xlabel('X (km)', fontsize=_FS); ax.set_ylabel('Y (km)', fontsize=_FS)
     ax.set_aspect('equal', adjustable='box')
 
-    _style_ax(ax)
+    ax.tick_params(axis='both', which='major', labelsize=_FS)
 
     _add_colorbar(fig, img, solar_constant)
 
     title = fig.text(_TITLE_X, _TITLE_Y, _make_title_str(moments[0]),
                      **{**_TITLE_KW, 'transform': fig.transFigure})
+    
     
     # -- Cursor -----
     n_lat = len(latitudes)
@@ -929,7 +958,9 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
         lat_deg = np.degrees(latitudes[row])
 
         annot.xy = (event.xdata, event.ydata)
-        annot.set_text(f"{val:.1f} W/m²\nLon: {lon_deg:.1f}°\nLat: {lat_deg:.1f}°")
+        state = (point_states[idx] if point_states.ndim == 2 else point_states)[ind]
+        annot.set_text(f"{val:.1f} W/m²\nLon: {lon_deg:.1f}°\nLat: {lat_deg:.1f}°\n{_STATE_LABELS[int(state)]}")
+        annot.set_fontsize(_FS)
         annot.set_visible(True)
         fig.canvas.draw_idle()
 
@@ -973,7 +1004,8 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
                       latitudes: np.ndarray[np.float64],
                       blocked_data: np.ndarray[np.ndarray[np.float64]],
                       moments: list[int],
-                      solar_constant: float):
+                      solar_constant: float,
+                      point_states: np.ndarray[np.int8]):
     '''
     Plots the 2D surface of the entire body as a equirectangular map
 
@@ -983,6 +1015,7 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
         blocked_data (np.ndarray[np.ndarray[np.float64]]):  List of blocked data for the points and the moments
         moments (list[int]):                                List of times which should be plotted
         solar_constant (float):                             The solar irradiance at the body and average time
+        point_states (np.ndarray[np.int8]):                 The state of each surface point, shape (N,).
     '''
 
     n_lat = len(latitudes)
@@ -1035,7 +1068,9 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
             idx = 0
         val = illumination[idx].reshape(n_lat, n_lon)[row, col] if illumination.ndim == 2 else illumination.reshape(n_lat, n_lon)[row, col]
         annot.xy = (event.xdata, event.ydata)
-        annot.set_text(f"{val:.1f} W/m²\nLon: {event.xdata:.1f}°\nLat: {event.ydata:.1f}°")
+        flat_ind = row * n_lon + col
+        state = (point_states[idx].ravel() if point_states.ndim == 2 else point_states.ravel())[flat_ind]
+        annot.set_text(f"{val:.1f} W/m²\nLon: {event.xdata:.1f}°\nLat: {event.ydata:.1f}°\n{_STATE_LABELS[int(state)]}")
         annot.set_visible(True)
         fig.canvas.draw_idle()
 
@@ -1296,7 +1331,7 @@ def select_parameters():
                          default="Earth", exclude=[OCCULTED])
         
     if not UTC:
-        UTC = _ask_utc("UTC Time of event", UTC)
+        UTC = _ask_utc("UTC Time when observer sees event", UTC)
 
     # ── Point ───────────────────────────────────────────────────────────────
     _section("Point-tracking mode")
