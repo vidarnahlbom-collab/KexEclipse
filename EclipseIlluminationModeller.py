@@ -8,7 +8,7 @@
 # ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
 # ║                                                                                          ║
 # ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
-# ║   2026-04-29  ·  KEX L5                                                                  ║
+# ║   2026-05-10  ·  KEX L5                                                                  ║
 # ║                                                                                          ║
 # ║                                                                                          ║
 # ║   Jupiter moon eclipse & illumination simulator                                          ║
@@ -22,7 +22,7 @@
 # ║   Do this by changing this flag to "TRUE" instead of "FALSE"                             ║
 # ║   The code will then instead follow selection in "if MANUAL_SELECTION:".                 ║                                                                      
 # ╚══════════════════════════════════════════════════════════════════════════════════════════╝
-MANUAL_SELECTION = True
+MANUAL_SELECTION = False
 
 """ Current errors and phenomena not handled by the model:
 Does not account for what part of the sun is blocked, so if two bodies are blocking the same part, it will count that twice
@@ -139,7 +139,7 @@ ANIM_SPEED = None
 if MANUAL_SELECTION:
     # region Spacetime Presets:
     # Europa eclipsed by Jupiter
-    UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']   
+    #UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']   
 
     # Jupiter eclipsed by Io
     #UTC, OCCULTED, OCCULTING = "2026 Mar 07 07:15:33", "Jupiter", ['Io'] 
@@ -156,10 +156,10 @@ if MANUAL_SELECTION:
 
     # Europa eclipse study 
     UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']
-    TIME_FRAME = 200
-    TIME_STEP = 25
-    LON_DEG = -12
-    LAT_DEG = 0
+    #TIME_FRAME = 200
+    #TIME_STEP = 25
+    #LON_DEG = -12
+    #LAT_DEG = 0
     # region Evaluation times (Ignore):
 
 
@@ -190,17 +190,17 @@ if MANUAL_SELECTION:
     # region MAIN CONFIGURATION:
     # Available time handling modes: Still, Slider, Animation
     # Available Presentation ways: Circle, Rectangle, Dots, Surface
-    MODE = "Still"
+    MODE = "Slider"
     PRESENTATION = "Circle"
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
-    CALCULATE_ILLUMINATION = False     # Chooses if the illumination function is used; bettcer lighting but slower
+    CALCULATE_ILLUMINATION = True     # Chooses if the illumination function is used; bettcer lighting but slower
     ONLY_VISIBLE_SURFACE = True    # Chooses if only half the occulted body should be shown (as seen from the observer)
 
     #Simulation Fidelity:
-    RESOLUTION = 500     # Number of points in each direction for surface point array, so total number of points is resolution^2
-    TIME_FRAME = 1000 # The time in seconds that the animation includes, back and forth
-    TIME_STEP = 1000     # The time in seconds that each step moves forward with
+    RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    TIME_FRAME = 200   # The time in seconds that the animation includes, back and forth
+    TIME_STEP = 100     # The time in seconds that each step moves forward with
     # endregion
 
     # region Coordinates for Point tracking mode
@@ -544,9 +544,9 @@ _FIG_W, _FIG_H   = 14, 9
 _PLOT_BOX        = [-0.2, -0.1, 1.2, 1.1, 0, 0.1]   # [left, bottom, right, top, wmargin, hmargin]
 _PLOT_RECT        = [0.18, 0.12, 0.60, 0.80]   # [left, bottom, width, height]
 _CBAR_RECT        = [0.90, 0.12, 0.03, 0.80]
-_SLIDER_RECT      = [0.18, 0.03, 0.60, 0.03]
+_SLIDER_RECT      = [0.10, 0.01, 0.80, 0.03]
 _TITLE_X, _TITLE_Y = 0.02, 0.97
-_TITLE_FS         = 18
+_TITLE_FS         = 16
 _FS         = 15
 _TITLE_KW = dict(fontsize=_TITLE_FS, va='top', ha='left',
                  wrap=True, linespacing=1.8, transform=None)  # transform set per-fig
@@ -595,7 +595,8 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          solar_constant,
                          longitudes: np.ndarray[np.float64],
                          latitudes: np.ndarray[np.float64],
-                         start_lonlat: tuple[float, float]):
+                         start_lonlat: tuple[float, float],
+                         point_states: np.ndarray[np.int8]):
     '''
     Plots part of the surface as a surface in 3D
     
@@ -607,6 +608,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         longitudes (np.ndarray):    Array of longitudes.
         latitudes (np.ndarray):     Array of latitudes.
         start_lonlat (tuple[float, float]): The starting longitude and latitude for the view.
+        point_states (np.ndarray):  Array of states for each surface point.
     '''
     def blocked_to_facecolors(blocked_idx):
         # Handle "Still" vs "Sequence" data
@@ -679,7 +681,7 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
     # -- Cursor ---
     current_frame = [0]
-    # readout = fig.text(0.02, 0.02, "", fontsize=10, va='bottom')
+    # readout = fig.text(0.02, 0.04, "", fontsize=10, va='bottom')
     # def on_pick(event):
     #     if MODE == "Still":
     #         idx = 0
@@ -711,10 +713,12 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
     #     val = (1 - (blocked_data[idx] if blocked_data.ndim == 2 else blocked_data))[closest] * solar_constant
 
     #     _, lon_sp, lat_sp = spice.reclat([px, py, pz])
+    #     state = (point_states[idx] if point_states.ndim == 2 else point_states)[ind]
     #     readout.set_text(
     #         f"{val:.1f} W/m²  |  "
     #         f"Lon: {np.degrees(lon_sp):.1f}°  "
-    #         f"Lat: {np.degrees(lat_sp):.1f}°"
+    #         f"Lat: {np.degrees(lat_sp):.1f}°  |  "
+    #         f"{_STATE_LABELS[int(state)]}"
     #     )
     #     fig.canvas.draw_idle()
 
@@ -799,7 +803,7 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
     # -- Cursor ---
     current_frame = [0]
-    readout = fig.text(0.02, 0.02, "", fontsize=10, va='bottom')
+    readout = fig.text(0.02, 0.04, "", fontsize=10, va='bottom')
     def on_pick(event):
         if MODE == "Still":
             idx = 0

@@ -8,7 +8,7 @@
 # ║   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝     ╚═╝╚══════╝                                 ║
 # ║                                                                                          ║
 # ║   Vidar Cardell Nahlbom, Andreas Jensen Herres                                           ║
-# ║   2026-04-29  ·  KEX L5                                                                  ║
+# ║   2026-05-10  ·  KEX L5                                                                  ║
 # ║                                                                                          ║
 # ║   Adapted from the example on the documentation page for gfoclt                          ║
 # ║   https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/spicelib/gfoclt.html           ║
