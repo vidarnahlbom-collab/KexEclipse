@@ -148,7 +148,7 @@ if MANUAL_SELECTION:
     #UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:45:19", "Jupiter", ['Io', 'Europa', 'Callisto'] 
 
     # Two shadow transits in the same spot on Jupiter with Io and Callisto
-    #UTC, OCCULTED, OCCULTING = "2015 Jan 24 06:27:00", "Jupiter", ['Io', 'Callisto']
+    #UTC, OCCULTED, OCCULTING = "2015 Jan 24 05:50:00", "Jupiter", ['Io', 'Callisto']
 
     # Io eclipsed by Callisto
     #UTC, OCCULTED, OCCULTING = "2021 Apr 20 15:55:38", "Io", ['Callisto']
@@ -190,7 +190,7 @@ if MANUAL_SELECTION:
     # region MAIN CONFIGURATION:
     # Available time handling modes: Still, Slider, Animation
     # Available Presentation ways: Circle, Rectangle, Dots, Surface
-    MODE = "Slider"
+    MODE = "Animation"
     PRESENTATION = "Circle"
     # Flags:
     POINT = False               # Ignores mode and presentation if true, if true more than 3 moments/times have to be calculated for
@@ -198,9 +198,9 @@ if MANUAL_SELECTION:
     ONLY_VISIBLE_SURFACE = True    # Chooses if only half the occulted body should be shown (as seen from the observer)
 
     #Simulation Fidelity:
-    RESOLUTION = 100     # Number of points in each direction for surface point array, so total number of points is resolution^2
+    RESOLUTION = 100  # Number of points in each direction for surface point array, so total number of points is resolution^2
     TIME_FRAME = 200   # The time in seconds that the animation includes, back and forth
-    TIME_STEP = 100     # The time in seconds that each step moves forward with
+    TIME_STEP = 25  # The time in seconds that each step moves forward with
     # endregion
 
     # region Coordinates for Point tracking mode
@@ -210,14 +210,14 @@ if MANUAL_SELECTION:
 
     # region Surface point zone zooming and panning:
     LAT_OFFSET = np.deg2rad(0) # Default 0 (double shadow 1.2) [Range: -90 to 90]
-    LON_OFFSET = np.deg2rad(0) # Default 0 (double shadow -18) [Range: -180 to 180]
-    LAT_PORTION = 1 # Default 1 (double shadow 20) Values>1
-    LON_PORTION = 1 + ONLY_VISIBLE_SURFACE + 0 # Default 1 + ONLY_VISIBLE_SURFACE (double shadow +40) Values>1
+    LON_OFFSET = np.deg2rad(0) # Default 0 (double shadow +2.8) [Range: -180 to 180]
+    LAT_PORTION = 1 # Default 1 (double shadow 40) Values>1
+    LON_PORTION = 1 + ONLY_VISIBLE_SURFACE + 0 # Default 1 + ONLY_VISIBLE_SURFACE (double shadow +80) Values>1
     # endregion
 
     # region Other options:
     ABCORR = "LT+S"
-    ANIM_SPEED = 500 # Milliseconds between frames of animation
+    ANIM_SPEED = 100 # Milliseconds between frames of animation
     # endregion
 
 
@@ -346,7 +346,14 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
         blocking_at_moment (np.ndarray[float64]):    Array of blocked fractions (0 to 1) for each surface point
         point_state_at_moment (np.ndarray[int8]):   Array of flags for each surface point: 0 = unlit, 1 = lit, 2 = penumbra, 3 = umbra
     '''
+    # Define point state flags
+    UNLIT    = 0
+    LIT      = 1
+    PENUMBRA = 2
+    UMBRA    = 3
     blocking_at_moment = np.ones(len(srf_points)) # Default is dark/unlit, so full block, 1
+    # Initialize all points as unlit
+    point_state_at_moment = np.full(len(blocking_at_moment), UNLIT, dtype=np.int8)
 
     if CALCULATE_ILLUMINATION:
         lit_flags, incidence_angles = get_illum(moment, srf_points)
@@ -357,7 +364,7 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
     lit_points = srf_points[lit_mask] # lit_points now only containts points that are lit
 
     if len(lit_points) == 0:
-        return blocking_at_moment  # everything dark, skip all SPICE work
+        return blocking_at_moment, point_state_at_moment  # everything dark, skip all SPICE work
 
     # We only get disk properties for the lit points
     # Get the disk properties of the sun and occulting body as seen from the surface points.
@@ -373,15 +380,6 @@ def blocking_moment(srf_points: np.ndarray[np.ndarray[np.float64]],
         # CURRENTLY ADDITATIVE.
         # WE DO NOT CALCULATE WHAT PART OF THE SUN IS BLOCKED. 
         # NEITHER IS LIMB DARKENING TAKEN INTO ACCOUNT.
-
-    # Define point state flags
-    UNLIT    = 0
-    LIT      = 1
-    PENUMBRA = 2
-    UMBRA    = 3
-
-    # Initialize all points as unlit
-    point_state_at_moment = np.full(len(blocking_at_moment), UNLIT, dtype=np.int8)
 
     # Classify lit points based on their blocking fraction
     point_state_at_moment[lit_mask] = np.where(
@@ -803,26 +801,40 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
 
     # -- Cursor ---
     current_frame = [0]
+    last_picked_ind = [None]
     readout = fig.text(0.02, 0.04, "", fontsize=10, va='bottom')
-    def on_pick(event):
-        if MODE == "Still":
-            idx = 0
-        elif MODE == "Slider":
-            idx = int(fig.slider.val)
-        elif MODE == "Animation":
-            idx = current_frame[0]
 
-        ind = event.ind[0]
-        val = (1 - (blocked_data[idx] if blocked_data.ndim == 2 else blocked_data))[ind] * solar_constant
+    def update_readout(point_idx, frame_idx):
+        if point_idx is None:
+            return
+        
+        blocked = blocked_data[frame_idx] if blocked_data.ndim == 2 else blocked_data
+        val = (1 - blocked[point_idx]) * solar_constant
 
-        _, lon_sp, lat_sp = spice.reclat([x[ind], y[ind], z[ind]])
-        state = (point_states[idx] if point_states.ndim == 2 else point_states)[ind]
+        _, lon_sp, lat_sp = spice.reclat([x[point_idx], y[point_idx], z[point_idx]])
+        
+        state_arr = point_states[frame_idx] if point_states.ndim == 2 else point_states
+        state = state_arr[point_idx]
+        
         readout.set_text(
             f"{val:.1f} W/m²  |  "
             f"Lon: {np.degrees(lon_sp):.1f}°  "
             f"Lat: {np.degrees(lat_sp):.1f}°  |  "
             f"{_STATE_LABELS[int(state)]}"
         )
+
+    def on_pick(event):
+        ind = event.ind[0]
+        last_picked_ind[0] = ind 
+        
+        if MODE == "Slider":
+            idx = int(fig.slider.val)
+        elif MODE == "Animation":
+            idx = current_frame[0]
+        else:
+            idx = 0
+            
+        update_readout(ind, idx)
         fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect("pick_event", on_pick)
@@ -839,6 +851,8 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                 idx = int(slider.val)
                 scatter.set_color(make_colors(blocked_data[idx]))
                 title.set_text(_make_title_str(moments[idx]))
+                if last_picked_ind[0] is not None:
+                    update_readout(last_picked_ind[0], idx)
                 fig.canvas.draw_idle()
 
             slider.on_changed(update_slider)
@@ -853,6 +867,8 @@ def visualize_3D_dots(blocked_data: np.ndarray[np.ndarray[np.float64]],
                 current_frame[0] = frame
                 scatter.set_color(make_colors(blocked_data[frame]))
                 title.set_text(_make_title_str(moments[frame]))
+                if last_picked_ind[0] is not None:
+                    update_readout(last_picked_ind[0], frame)
                 return scatter,
 
             ani = FuncAnimation(fig, update_animation, frames=len(blocked_data),
@@ -933,26 +949,21 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
     # -- Cursor -----
     n_lat = len(latitudes)
     n_lon = len(longitudes)
+
+    last_mouse_event = [None]
     annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points",
                         bbox=dict(boxstyle="round", fc="white", alpha=0.8))
+    annot.set_fontsize(_FS)
     annot.set_visible(False)
     current_frame = [0]  # list so it's mutable from nested functions
-    def on_move(event):
-        if event.inaxes != ax:
-            annot.set_visible(False)
-            fig.canvas.draw_idle()
+
+    def update_annot_text(event, idx):
+        if event is None or event.inaxes != ax:
             return
 
         # Find closest surface point in projected space
         dist = (u_coords - event.xdata)**2 + (v_coords - event.ydata)**2
         ind = np.argmin(dist)
-
-        if MODE == "Slider":
-            idx = int(slider.val)
-        elif MODE == "Animation":
-            idx = current_frame[0]
-        else:
-            idx = 0
 
         val = illumination[idx][ind] if illumination.ndim == 2 else illumination[ind]
 
@@ -963,9 +974,26 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
 
         annot.xy = (event.xdata, event.ydata)
         state = (point_states[idx] if point_states.ndim == 2 else point_states)[ind]
+        
         annot.set_text(f"{val:.1f} W/m²\nLon: {lon_deg:.1f}°\nLat: {lat_deg:.1f}°\n{_STATE_LABELS[int(state)]}")
         annot.set_fontsize(_FS)
         annot.set_visible(True)
+    
+    def on_move(event):
+        last_mouse_event[0] = event
+        if event.inaxes != ax:
+            annot.set_visible(False)
+            fig.canvas.draw_idle()
+            return
+        
+        if MODE == "Slider":
+            idx = int(slider.val)
+        elif MODE == "Animation":
+            idx = current_frame[0]
+        else:
+            idx = 0
+            
+        update_annot_text(event, idx)
         fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect("motion_notify_event", on_move)
@@ -992,6 +1020,9 @@ def graph_2D_circle(longitudes: np.ndarray[np.float64],
                 current_frame[0] = frame  # track it
                 img.set_array(make_image(illumination[frame]).ravel())
                 title.set_text(_make_title_str(moments[frame]))
+
+                if annot.get_visible():
+                    update_annot_text(last_mouse_event[0], frame)
                 return img, title
 
             ani = FuncAnimation(fig, update, frames=len(moments),
@@ -1049,33 +1080,45 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
                      **{**_TITLE_KW, 'transform': fig.transFigure})
     
     # -- Cursor ---
+    last_mouse_event = [None]
     annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points",
                         bbox=dict(boxstyle="round", fc="white", alpha=0.8))
     annot.set_visible(False)
     current_frame = [0]  # list so it's mutable from nested functions
 
-    def on_move(event):
-        if event.inaxes != ax:
-            annot.set_visible(False)
-            fig.canvas.draw_idle()
+    def update_annot_text(event, idx):
+        if event is None or event.inaxes != ax:
             return
+        
         # get the data value at cursor
         col = int(np.searchsorted(np.degrees(longitudes), event.xdata+0.9) - 1)
         row = int(np.searchsorted(np.degrees(latitudes),  event.ydata+0.5) - 1)
         col = np.clip(col, 0, n_lon - 1)
         row = np.clip(row, 0, n_lat - 1)
-        if MODE == "Slider":
-            idx = int(slider.val)
-        elif MODE == "Animation":
-            idx = current_frame[0]
-        else:
-            idx = 0
+
         val = illumination[idx].reshape(n_lat, n_lon)[row, col] if illumination.ndim == 2 else illumination.reshape(n_lat, n_lon)[row, col]
         annot.xy = (event.xdata, event.ydata)
         flat_ind = row * n_lon + col
         state = (point_states[idx].ravel() if point_states.ndim == 2 else point_states.ravel())[flat_ind]
         annot.set_text(f"{val:.1f} W/m²\nLon: {event.xdata:.1f}°\nLat: {event.ydata:.1f}°\n{_STATE_LABELS[int(state)]}")
         annot.set_visible(True)
+        fig.canvas.draw_idle()
+
+    def on_move(event):
+        last_mouse_event[0] = event
+        if event.inaxes != ax:
+            annot.set_visible(False)
+            fig.canvas.draw_idle()
+            return
+        
+        if MODE == "Slider":
+            idx = int(slider.val)
+        elif MODE == "Animation":
+            idx = current_frame[0]
+        else:
+            idx = 0
+            
+        update_annot_text(event, idx)
         fig.canvas.draw_idle()
 
     fig.canvas.mpl_connect("motion_notify_event", on_move)
@@ -1103,6 +1146,9 @@ def graph_2D_rectangle(longitudes: np.ndarray[np.float64],
                 current_frame[0] = frame  # track it
                 img.set_array(illumination[frame].reshape(n_lat, n_lon).ravel())
                 title.set_text(_make_title_str(moments[frame]))
+
+                if annot.get_visible():
+                    update_annot_text(last_mouse_event[0], frame)
                 return img, title
 
             ani = FuncAnimation(fig, update, frames=len(moments),
