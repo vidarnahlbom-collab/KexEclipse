@@ -234,6 +234,8 @@ def main() -> None:
     blocking_total = np.array([]) 
     point_states = np.array([])
     moments = []
+    lonlats = [] # NOT WORKING YET, USE TO TRACK OBSERVER PERSPECTIVE IN ANIMATION IN SURFACE MODE ONLY
+    track_subobserver_point = False # This is for tracking the subobserver point in surface mode
 
     start_rec, trgepc, sub_observer_vector = spice.subpnt("NEAR POINT/ELLIPSOID", OCCULTED, et_reception, "IAU_" + OCCULTED, ABCORR, OBSERVER)
     
@@ -254,6 +256,9 @@ def main() -> None:
         moments.append(et_reception)
     else:
         for i, moment_reception in enumerate(range(et_reception-TIME_FRAME, et_reception+TIME_FRAME+1, TIME_STEP)):
+            if track_subobserver_point:
+                obs_perspective = spice.reclat(spice.subpnt("NEAR POINT/ELLIPSOID", OCCULTED, moment_reception, "IAU_" + OCCULTED, ABCORR, OBSERVER)[0])[1:]
+                lonlats.append(obs_perspective)
             moment_emission = moment_reception - light_travel_time
             print(f"Calculating moment {i+1}/{(2*TIME_FRAME)//TIME_STEP+1}...")
             blocking_at_moment, point_state_at_moment = blocking_moment(srf_points, moment_emission)
@@ -272,7 +277,7 @@ def main() -> None:
     elif PRESENTATION == "Dots":
         visualize_3D_dots(blocking_total, srf_points, moments, solar_constant, start_lonlat, point_states)
     elif PRESENTATION == "Surface":
-        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat, point_states)
+        visualize_3D_surface(blocking_total, srf_points, moments, solar_constant, longitudes, latitudes, start_lonlat, point_states, lonlats, track_subobserver_point)
 
     
 
@@ -594,7 +599,9 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
                          longitudes: np.ndarray[np.float64],
                          latitudes: np.ndarray[np.float64],
                          start_lonlat: tuple[float, float],
-                         point_states: np.ndarray[np.int8]):
+                         point_states: np.ndarray[np.int8],
+                         lonlats: np.ndarray[np.float64],
+                         track_subobserver_point: bool):
     '''
     Plots part of the surface as a surface in 3D
     
@@ -607,6 +614,8 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         latitudes (np.ndarray):     Array of latitudes.
         start_lonlat (tuple[float, float]): The starting longitude and latitude for the view.
         point_states (np.ndarray):  Array of states for each surface point.
+        lonlats (np.ndarray):       Array of longitude/latitude pairs for the observer's perspective.
+        track_subobserver_point (bool): Whether to track the subobserver point.
     '''
     def blocked_to_facecolors(blocked_idx):
         # Handle "Still" vs "Sequence" data
@@ -732,6 +741,8 @@ def visualize_3D_surface(blocked_data: np.ndarray[np.ndarray[np.float64]],
         # 2. Update title
         title.set_text(_make_title_str(moments[idx]))
         # 3. Force draw (draw_idle is better for interactivity)
+        if track_subobserver_point:
+            ax.view_init(elev=np.degrees(lonlats[idx][1]), azim=np.degrees(lonlats[idx][0]))
         fig.canvas.draw_idle()
         return surf, title
     
