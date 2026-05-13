@@ -160,7 +160,7 @@ if MANUAL_SELECTION:
     # endregion
 
     # Callisto eclipsed by Jupiter
-    UTC, OCCULTED, OCCULTING = "2026-01-01 20:05:53", "Callisto", ['Jupiter']
+    #UTC, OCCULTED, OCCULTING = "2026-01-01 20:05:53", "Callisto", ['Jupiter']
 
     # Europa eclipse study 
     UTC, OCCULTED, OCCULTING = "2015 Mar 24 00:25:00", "Europa", ['Jupiter']
