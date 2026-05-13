@@ -32,11 +32,6 @@ Does not take into account limb darkening
 Surface points are only calculated once, so if observer perspective shifts alot during time frame,
 the points seen at the ends of the time frame are not accurate. 
 In essence, only the middle frame is accurate. 
-
-Time is ahead by 30 seconds compared to other comparable programs, we do not know why but this is a consistent error
-We have adjusted it manually so its correct
-
-Outside of that error, spacetime is correct within 2 seconds
 """
 
 # region Initial setup: dependency check, kernel furnishing and global inits
@@ -236,10 +231,6 @@ def main() -> None:
     start_time = time.time()
     
     et_reception = int(spice.utc2et(UTC))
-    # OBS OBS WE DO NOT KNOW WHY
-    et_reception = et_reception + 30 # ADD 30 SECONDS HERE AS MANUAL ERROR ADJUSTMENT, WE DO NOT KNOW WHY BUT OUR MODEL IS ALWAYS 30 SECONDS AHEAD
-    # OF OTHER COMPARABLE PROGRAMS
-
 
     # We will store the blocked fractions for every time step here, so we can use it for the animation later without having to recalculate it. 
     # This is a 2D array where each row corresponds to a time step and each column corresponds to a surface point.
